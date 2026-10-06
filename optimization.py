@@ -320,7 +320,10 @@ pd.set_option('display.max_columns', None)
 # Train Accuracy:  0.8745046235138706
 # Validation Accuracy:  0.8432835820895522
 # Combined Accuracy:  0.867564534231201
-# Validation Accuracy with Threshold Adjustment:  0.8880597014925373
+# Validation Accuracy with Threshold Adjustment:  0.8582089552238806
+
+# Session 44
+
 
 # Data
 opt_df = pd.read_csv('/Users/johnd/Desktop/Berkeley/DMA/kaggle/optimization.csv')

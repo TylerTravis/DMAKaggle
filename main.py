@@ -12,7 +12,7 @@ RANDOM_SEED = 42
 random.seed(RANDOM_SEED)
 
 # Download latest version
-# path = kagglehub.competition_download('dma-26-kaggle-competition')
+path = kagglehub.competition_download('dma-26-kaggle-competition')
 
 train_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/train.csv')
 test_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/test.csv')
@@ -130,6 +130,22 @@ print("Train Accuracy: ", train_acc)
 val_acc = rs_bst.score(X_val, Y_val)
 print("Validation Accuracy: ", val_acc)
 
+# Pred Prob Threshold
+val_probs = rs_bst.predict_proba(X_val)[:, 1]
+
+best_thresh = 0.5
+best_acc = 0
+
+# Test thresholds 0.1 to 0.9
+for thresh in np.arange(0.1, 0.9, 0.0001):
+	preds = (val_probs >= thresh).astype(int)
+	acc = np.mean(preds == Y_val)
+	if acc > best_acc:
+		best_acc = acc
+		best_thresh = thresh
+
+print('Validation Accuracy with Threshold Adjustment: ', best_acc)
+
 # Recombine Training and Validation Data
 X_train = pd.concat([X_train, X_val])
 Y_train = pd.concat([Y_train, Y_val])
@@ -140,24 +156,9 @@ rs_bst.fit(X_train, Y_train)
 comb_acc = rs_bst.score(X_train, Y_train)
 print("Combined Accuracy: ", comb_acc)
 
-# Prediction Probability Threshold
-val_probs = rs_bst.predict_proba(X_val)[:, 1]
-
-best_thresh = 0.5
-best_acc = 0
-
-# Test thresholds 0.15 to 0.85
-for thresh in np.arange(0.15, 0.85, 0.01):
-	preds = (val_probs >= thresh).astype(int)
-	acc = np.mean(preds == Y_val)
-	if acc > best_acc:
-		best_acc = acc
-		best_thresh = thresh
-
+# Final Subission Preds
 test_probs = rs_bst.predict_proba(X_test)[:, 1]
 submission_preds = (test_probs >= best_thresh).astype(int)
-
-print('Validation Accuracy with Threshold Adjustment: ', best_acc)
 
 # Export Submission Data
 submission_df = pd.DataFrame({
