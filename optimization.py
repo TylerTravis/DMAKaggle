@@ -2,6 +2,8 @@ import pandas as pd
 import ast
 import matplotlib.pyplot as plt
 
+pd.set_option('display.max_columns', None)
+
 # Session 3:
 	# Train Accuracy: 0.8383838383838383
 	# Cross-Validation Accuracy: 0.8215617349821104
@@ -208,11 +210,12 @@ import matplotlib.pyplot as plt
 	# Cross-Validation Accuracy:  0.8485029188374866
 	# BEST HYPERPARAMETERS:  {'max_iter': 200, 'max_depth': 12, 'learning_rate': 0.04, 'l2_regularization': 0.4}
 
+# Model Change: HGB -> XGB
+
+# Session 25
+
 # Data
 opt_df = pd.read_csv('/Users/johnd/Desktop/Berkeley/DMA/kaggle/optimization.csv')
-
-# MLP - RF - HGB
-MODEL = 'HGB'
 
 opt_filtered = opt_df.nsmallest(100, 'rank_test_score')
 opt_sorted = opt_filtered.sort_values(by='rank_test_score', ascending=False)
@@ -221,36 +224,25 @@ opt_sorted = opt_filtered.sort_values(by='rank_test_score', ascending=False)
 best_h = opt_sorted['params'].iloc[0]
 print("BEST HYPERPARAMETERS: ", best_h)
 
-if MODEL == 'MLP':
-	# Number of Hidden Layers
-	parsed_tuples = opt_df['param_hidden_layer_sizes'].apply(ast.literal_eval)
-	opt_df['num_hidden_layers'] = parsed_tuples.apply(len)
-
-	# Number of Nodes at each Layer
-	layer_columns = pd.DataFrame(parsed_tuples.tolist(), index=opt_df.index)
-	layer_columns.columns = [f'nodes_layer_{i + 1}' for i in layer_columns.columns]
-	opt_df = pd.concat([opt_df, layer_columns], axis=1)
-
-	columns_to_analyze = ['param_solver', 'param_alpha', 'param_activation', 'num_hidden_layers'] + list(layer_columns.columns)
-elif MODEL == 'HGB':
-	columns_to_analyze = ['param_max_iter', 'param_max_depth', 'param_learning_rate', 'param_l2_regularization']
+columns_to_analyze = [
+	'param_subsample',
+	'param_reg_lambda',
+	'param_reg_alpha',
+	'param_n_estimators',
+	'param_min_child_weight',
+	'param_max_depth',
+	'param_learning_rate',
+	'param_gamma',
+	'param_colsample_bytree'
+]
 
 for col in columns_to_analyze:
-	if 'nodes_layer' in col:
-		print("Column: ", col)
-		col_mean = opt_sorted[col].mean()
-		col_std = opt_sorted[col].std()
-		print("Mean: ", col_mean)
-		print("Standard Deviation: ", col_std)
+	proportions = opt_sorted[col].value_counts(normalize=True) * 100
+	print(proportions, '%')
 
-	else:
-		proportions = opt_sorted[col].value_counts(normalize=True) * 100
-		print(proportions, '%')
+	plt.hist(opt_sorted[col], bins=10, color='red', edgecolor='black')
 
-		if MODEL == 'HGB':
-			plt.hist(opt_sorted[col], bins=10, color='red', edgecolor='black')
-
-			plt.title(col)
-			plt.xlabel('Value')
-			plt.ylabel('Count')
-			plt.show()
+	plt.title(col)
+	plt.xlabel('Value')
+	plt.ylabel('Count')
+	plt.show()

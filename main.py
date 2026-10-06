@@ -2,12 +2,16 @@ import kagglehub
 import pandas as pd
 import numpy as np
 import random
+import xgboost as xgb
 
-from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RandomizedSearchCV, GridSearchCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import train_test_split
+
+RANDOM_SEED = 42
+OPTIMIZING = True
+
+random.seed(RANDOM_SEED)
 
 # Download latest version
 # path = kagglehub.competition_download('dma-26-kaggle-competition')
@@ -15,19 +19,12 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 train_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/train.csv')
 test_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/test.csv')
 
-# Models: MLP - RF - HGB
-RANDOM_SEED = 42
-MODEL = 'HGB'
-OPTIMIZING = False
-
-random.seed(RANDOM_SEED)
 test_passenger_ids = test_df['PassengerId']
 
 def process_data(df):
-	if MODEL == 'MLP':
-		# Impute Missing Values
-		df['Age'] = df['Age'].fillna(df['Age'].mean())
-		df['Fare'] = df['Fare'].fillna(df['Fare'].mean())
+	# Impute Missing Values
+	df['Age'] = df['Age'].fillna(df['Age'].mean())
+	df['Fare'] = df['Fare'].fillna(df['Fare'].mean())
 
 	# Quantitative and One-Hot Refactor
 
@@ -82,139 +79,85 @@ cols_to_scale = ['SibSp', 'Parch', 'Log_Fare', 'Log_Age']
 X_train[cols_to_scale] = scaler.fit_transform(X_train[cols_to_scale])
 X_test[cols_to_scale] = scaler.transform(X_test[cols_to_scale])
 
+# Validation Split
+X_train, X_val, Y_train, Y_val = train_test_split(
+	X_train, Y_train, test_size=0.15, random_state=RANDOM_SEED
+)
 
-if MODEL == 'MLP':
-	clf = MLPClassifier(hidden_layer_sizes=(22, 22), solver='lbfgs', alpha=0.0075, activation='relu', random_state=RANDOM_SEED, max_iter=1000)
+# Classifier
+train_matrix = xgb.DMatrix(X_train, label=Y_train)
+test_matrix = xgb.DMatrix(X_test)
 
-	# Layers and Node Counts
-	node_sizes = range(19, 26)
-	hidden_layer_sizes = []
+params = {
+	'max_depth': 4,
+	'learning_rate': 0.05,
+	'n_estimators': 150,
+	'min_child_weight': 3,
+	'subsample': 0.8,
+	'colsample_bytree': 0.8,
+	'gamma': 0.1,
+	'random_state': RANDOM_SEED,
+	'eval_metric': 'logloss'
+}
 
-	# Randomly Generate Various Layer Sizes
-	for _ in range(100):
-		num_layers = random.randint(2, 3)
-		architecture = tuple(random.choice(node_sizes) for _ in range(num_layers))
-		hidden_layer_sizes.append(architecture)
+param_grid = {
+	'max_depth': [3, 4, 5],
+	'learning_rate': [0.01, 0.02, 0.05, 0.1],
+	'n_estimators': [100, 150, 200, 300],
+	'min_child_weight': [3, 5, 7],
+	'subsample': [0.6, 0.7, 0.8, 0.9],
+	'colsample_bytree': [0.6, 0.7, 0.8, 0.9],
+	'gamma': [0, 0.1, 0.25, 0.5],
+	'reg_alpha': [0, 0.01, 0.1],
+	'reg_lambda': [1, 1.5, 2]
+}
 
-	param_grid = {
-		'hidden_layer_sizes': hidden_layer_sizes,
-		'activation': ['relu'],
-		'alpha': [0.05, 0.075, 0.01],
-		'solver': ['lbfgs']
-	}
-elif MODEL == 'RF':
-	clf = RandomForestClassifier(random_state=RANDOM_SEED)
-
-	n_estimators = [i * 50 for i in range(1, 11)]
-	max_depth = [i for i in range(1, 21)]
-	min_samples_split = [i for i in range(2, 11)]
-	min_samples_leaf = [i for i in range(1, 6)]
-
-	param_grid = {
-		'n_estimators': n_estimators,
-		'max_depth': max_depth,
-		'min_samples_split': min_samples_split,
-		'min_samples_leaf': min_samples_leaf
-	}
-elif MODEL == 'HGB':
-	clf = HistGradientBoostingClassifier(learning_rate=0.04, max_iter=200, max_depth= 12, l2_regularization=0.4, random_state=RANDOM_SEED)
-
-	learning_rates = [i * 0.005 for i in range(4, 11)]
-	max_iterations = [i * 50 for i in range(4, 9)]
-	max_depth = [i for i in range(9, 16)]
-	l2_reg = [i * 0.05 for i in range(1, 11)]
-
-	param_grid = {
-		'learning_rate': learning_rates,
-		'max_iter': max_iterations,
-		'max_depth': max_depth,
-		'l2_regularization': l2_reg
-	}
-
-def opt_hp(
-	# Base Model
-	clf,
-	# Initial Params
-	param_grid,
-	# Performance Refinement Iterations
-	max_iter,
-	# Number of Models Tested In Each Iteration
-	n_iter,
-	# Proportion of top-performing models to select
-	top_perf_refine_prop,
-	halting_threshold,
-	halting_count
-	):
-
-	cv_mean_acc_history = []
-	clf_history = []
-
-	current_param_grid = param_grid
-	eval_count = 0
-
-	def dive():
-		opt_clf = RandomizedSearchCV(
-			estimator=clf,
-			param_grid=param_grid,
-			n_iter=n_iter,
-			cv=5,
-			scoring='accuracy',
-			n_jobs=-1,
-			random_state=RANDOM_SEED
-		)
-
-		nonlocal eval_count
-		eval_count += 1
-
-		# Accuracy
-		cv_mean_acc_history.append(opt_clf.cv_results_['mean_test_score'].mean())
-
-		# Halting
-		if len(cv_mean_acc_history) >= halting_count:
-			cv_mean_acc_recent_range = max(cv_mean_acc_history[-halting_count]) - min(cv_mean_acc_history[-halting_count])
-
-			if cv_mean_acc_recent_range < halting_threshold:
-				clf_history.append(opt_clf)
-
-				nonlocal current_param_grid
-				current_param_grid = param_grid
-
-		# Refinement
-		perf_df = pd.DataFrame(clf.cv_results_)
-
-		perf_filtered = perf_df.nsmallest(int(top_perf_refine_prop * n_iter), 'rank_test_score')
-
-		# for param in param_grid:
+bst = xgb.XGBClassifier(**params)
 
 
-	for i in range(max_iter):
-		dive()
 
 if OPTIMIZING:
-	opt_hp(
-		clf=clf,
-		param_grid=param_grid
+	top_perf_refine_prop = 0.1
+	n_iter = 1000
+
+	rs_bst = RandomizedSearchCV(
+		estimator=bst,
+		param_distributions=param_grid,
+		n_iter=125,
+		cv=5,
+		scoring='accuracy',
+		n_jobs=-1,
+		random_state=RANDOM_SEED,
+		return_train_score=True
 	)
 
+	rs_bst.fit(X_train, Y_train)
 
-clf.fit(X_train, Y_train)
+	# Export hyperparameter data
+	perf_df = pd.DataFrame(rs_bst.cv_results_)
+	perf_df.to_csv('optimization.csv', index=False)
+
+
+bst.fit(X_train, Y_train)
 
 # Train Preds and Acc
-train_pred = clf.predict(X_train)
-train_acc = clf.score(X_train, Y_train)
+train_pred = bst.predict(X_train)
+train_acc = bst.score(X_train, Y_train)
 print("Train Accuracy: ", train_acc)
 
-# if OPTIMIZING:
-# 	# CV Acc
-# 	train_cv_acc = clf.best_score_
-# 	print("Cross-Validation Accuracy: ", train_cv_acc)
-#
-# 	# Export hyperparameter data
-# 	results_df = pd.DataFrame(clf.cv_results_)
-# 	results_df.to_csv('optimization.csv', index=False)
+if OPTIMIZING:
+	# CV Acc
+	train_cv_acc = rs_bst.best_score_
+	print("Cross-Validation Accuracy: ", train_cv_acc)
+
+# Validation Preds and Acc
+best_model = rs_bst.best_estimator_
+val_acc = best_model.score(X_val, Y_val)
+print("Validation Accuracy: ", val_acc)
+
 
 # Export Submission Data
-submission_preds = clf.predict(X_test)
+submission_preds = bst.predict(X_test)
 submission_df = pd.DataFrame({
     'PassengerId': test_passenger_ids,
     'Survived': submission_preds
