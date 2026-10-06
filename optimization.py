@@ -212,7 +212,115 @@ pd.set_option('display.max_columns', None)
 
 # Model Change: HGB -> XGB
 
-# Session 25
+# Session 25-32 - Feature Engineering (Pre Is-Childing Testing Not Recorded)
+
+# All Features ++
+
+# Train Accuracy: 0.8956406869220608
+# Validation Accuracy: 0.8283582089552238
+# Combined Accuracy: 0.8843995510662177
+
+# No Is Alone +++
+
+# Train Accuracy: 0.8850726552179656
+# Validation Accuracy: 0.835820895522388
+# Combined Accuracy: 0.8799102132435466
+
+# No Fare Per Person +
+
+# IsChild < 15 ++++ WITH ALL OTHERS
+# Train Accuracy: 0.8982826948480845
+# Validation Accuracy: 0.8283582089552238
+# Combined Accuracy: 0.8888888888888888
+
+# IsChild < 15 +++++ WITH ONLY FAMILY SIZE
+# Train Accuracy: 0.8784676354029062
+# Validation Accuracy: 0.835820895522388
+# Combined Accuracy: 0.8821548821548821
+
+# IsChild < 15 ++++ WITH NO OTHERS
+# Train Accuracy: 0.8705416116248349
+# Validation Accuracy: 0.8208955223880597
+# Combined Accuracy: 0.8731762065095399
+
+# Best Feature Scores
+# n_iter = 125
+# Train Accuracy: 0.8784676354029062
+# Validation Accuracy: 0.835820895522388
+# Combined Accuracy: 0.8821548821548821
+
+# Session 33
+# n_iter 125 -> 150
+# Train Accuracy:  0.8784676354029062
+# Validation Accuracy:  0.835820895522388
+# Combined Accuracy:  0.8821548821548821
+
+# Session 33
+# n_iter 150 -> 100
+# Train Accuracy:  0.8745046235138706
+# Validation Accuracy:  0.8208955223880597
+# Combined Accuracy:  0.8698092031425365
+
+# Session 34
+# n_iter 150 -> 120
+# Train Accuracy:  0.8745046235138706
+# Validation Accuracy:  0.8208955223880597
+# Combined Accuracy:  0.8698092031425365
+
+# Session 35
+# n_iter 120 -> 115
+# Train Accuracy:  0.8784676354029062
+# Validation Accuracy:  0.835820895522388
+# Combined Accuracy:  0.8821548821548821
+
+# Session 36
+# 3-4 depth -> 3
+# Train Accuracy:  0.8586525759577279
+# Validation Accuracy:  0.8208955223880597
+# Combined Accuracy:  0.8552188552188552
+
+# Session 37
+# 3 depth -> 4
+# Train Accuracy:  0.8731836195508587
+# Validation Accuracy:  0.8134328358208955
+# Combined Accuracy:  0.8754208754208754
+
+# Session 38
+# 4 depth -> 3,4,5
+# Train Accuracy:  0.8678996036988111
+# Validation Accuracy:  0.8283582089552238
+# Combined Accuracy:  0.8641975308641975
+
+# Session 39
+# 3,4,5 depth -> 3,4
+# Train Accuracy:  0.8678996036988111
+# Validation Accuracy:  0.8283582089552238
+# Combined Accuracy:  0.8641975308641975
+
+# Session 40
+# LR 0.05, 0.075, 0.1 -> 0.001, 0.025, 0.05
+# Train Accuracy:  0.8824306472919419
+# Validation Accuracy:  0.8208955223880597
+# Combined Accuracy:  0.8922558922558923
+
+# Session 41
+# estimators 100, 125, 150 -> 120, 125, 130
+# Train Accuracy:  0.8784676354029062
+# Validation Accuracy:  0.835820895522388
+# Combined Accuracy:  0.8821548821548821
+
+# Session 42
+# Data Imputation for Fare and Age brought back (median)
+# Train Accuracy:  0.8745046235138706
+# Validation Accuracy:  0.8432835820895522
+# Combined Accuracy:  0.867564534231201
+
+# Session 43
+# Threshold finder 0.5 -> 0.15-0.85
+# Train Accuracy:  0.8745046235138706
+# Validation Accuracy:  0.8432835820895522
+# Combined Accuracy:  0.867564534231201
+# Validation Accuracy with Threshold Adjustment:  0.8880597014925373
 
 # Data
 opt_df = pd.read_csv('/Users/johnd/Desktop/Berkeley/DMA/kaggle/optimization.csv')
