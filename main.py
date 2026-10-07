@@ -1,23 +1,36 @@
+# General
+import catboost
 import kagglehub
 import pandas as pd
 import numpy as np
 import random
-import xgboost as xgb
+import pprint
 
+# SKLearn
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import VotingClassifier
+
+# Models
+import xgboost as xgb
+import catboost as cb
+import lightgbm as lgb
 
 RANDOM_SEED = 42
 
 random.seed(RANDOM_SEED)
 
 # Download latest version
-path = kagglehub.competition_download('dma-26-kaggle-competition')
+# path = kagglehub.competition_download('dma-26-kaggle-competition')
 
 train_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/train.csv')
 test_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/test.csv')
 
 test_passenger_ids = test_df['PassengerId']
+
+# Imputation
+train_age_median = train_df['Age'].median()
+train_fare_median = train_df['Fare'].median()
 
 def process_data(df):
 	# Quantification and One-Hots
@@ -39,18 +52,19 @@ def process_data(df):
 	df = pd.concat([df, embarked_dummies], axis=1)
 
 	# Cabin
-	cabin_dummies = pd.get_dummies(df['Cabin'].str[0], prefix='Cabin', dummy_na=True, dtype=int)
-	df = pd.concat([df, cabin_dummies], axis=1)
+	# cabin_dummies = pd.get_dummies(df['Cabin'].str[0], prefix='Cabin', dummy_na=True, dtype=int)
+	# df = pd.concat([df, cabin_dummies], axis=1)
+
+	# Imputation
+	df['Age'] = df['Age'].fillna(train_age_median)
+	df['Fare'] = df['Fare'].fillna(train_fare_median)
 
 	# Feature Engineering
 	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
 	# df['IsAlone'] = df['FamilySize'].apply(lambda x: int(x == 1))
 	# df['FarePerPerson'] = df['Fare'] / df['FamilySize']
+	df['HasCabin'] = df['Cabin'].notna().astype(int)
 	df['IsChild'] = df['Age'].apply(lambda x: int(x < 15))
-
-	# Imputation
-	df['Age'] = df['Age'].fillna(df['Age'].median())
-	df['Fare'] = df['Fare'].fillna(df['Fare'].median())
 
 	return df
 
@@ -68,11 +82,25 @@ X_test = X_test.reindex(columns=X_train.columns, fill_value=0)
 
 # Validation Split
 X_train, X_val, Y_train, Y_val = train_test_split(
-	X_train, Y_train, test_size=0.15, random_state=RANDOM_SEED
+	X_train,
+	Y_train,
+	test_size=0.15,
+	random_state=RANDOM_SEED
 )
 
-# Classifier
-params = {
+master_params = {
+	'random_generations': 125,
+	'max_depth': [2, 3, 4],
+	'learning_rate': [0.025, 0.05, 0.075],
+	'n_estimators': [150, 100, 125],
+	'min_child_weight': [4, 5, 6],
+	'subsample': [0.6, 0.7, 0.8, 0.9],
+	'l1_leaf_reg': [0, 0.01, 0.1],
+	'l2_leaf_reg': [1, 1.5, 2, 2.5, 3.0]
+}
+
+# XGB Classifier
+xgb_params = {
 	'max_depth': 4,
 	'learning_rate': 0.05,
 	'n_estimators': 130,
@@ -86,79 +114,198 @@ params = {
 	'eval_metric': 'logloss'
 }
 
-param_grid = {
-	'max_depth': [3, 4],
-	'learning_rate': [0.025, 0.05, 0.075],
-	'n_estimators': [100, 125, 150],
-	'min_child_weight': [4, 5, 6],
-	'subsample': [0.6, 0.7, 0.8, 0.9],
-	'colsample_bytree': [0.6, 0.7, 0.8, 0.9],
+xgb_param_grid = {
+
+	'max_depth': master_params['max_depth'],
+	'learning_rate': master_params['learning_rate'],
+	'n_estimators': master_params['n_estimators'],
+	'min_child_weight': master_params['min_child_weight'],
+	'subsample': master_params['subsample'],
+	'colsample_bytree': master_params['subsample'],
 	'gamma': [0, 0.1, 0.25, 0.5],
-	'reg_alpha': [0, 0.01, 0.1],
-	'reg_lambda': [1, 1.5, 2]
+	'reg_alpha': master_params['l1_leaf_reg'],
+	'reg_lambda': master_params['l2_leaf_reg']
 }
 
-bst = xgb.XGBClassifier(**params)
+xgb_clf = xgb.XGBClassifier(**xgb_params)
 
-n_iter = 125
 
-rs_bst = RandomizedSearchCV(
-	estimator=bst,
-	param_distributions=param_grid,
-	n_iter=n_iter,
+rs_xgb_clf = RandomizedSearchCV(
+	estimator=xgb_clf,
+	param_distributions=xgb_param_grid,
+	n_iter=master_params['random_generations'],
 	cv=5,
 	scoring='accuracy',
 	n_jobs=-1,
 	random_state=RANDOM_SEED,
-	return_train_score=True
+	# return_train_score=True
 )
 
-rs_bst.fit(X_train, Y_train)
+rs_xgb_clf.fit(X_train, Y_train)
 
-# Export hyperparameter data
-perf_df = pd.DataFrame(rs_bst.cv_results_)
-perf_df.to_csv('optimization.csv', index=False)
+# CatBoost Classifier
+cat_params = {
+	'objective': 'Logloss',
+	'random_state': RANDOM_SEED,
+	'eval_metric': 'Accuracy',
+	'iterations': 125,
+	'min_data_in_leaf': 4,
+	'learning_rate': 0.05,
+	'l2_leaf_reg': 3.0,
+	'subsample': 0.66,
+	'depth': 3,
+	'verbose': 0
+}
 
-rs_bst = rs_bst.best_estimator_
+cat_param_grid = {
+	'objective': ['Logloss'],
+	'eval_metric': ['Accuracy'],
+	'depth': master_params['max_depth'],
+	'learning_rate': master_params['learning_rate'],
+	'iterations': master_params['n_estimators'],
+	'min_data_in_leaf': master_params['min_child_weight'],
+	'subsample':master_params['subsample'],
+	'l2_leaf_reg': master_params['l2_leaf_reg'],
+	'random_state': [RANDOM_SEED],
+}
 
-# Train Preds and Acc
-train_pred = rs_bst.predict(X_train)
-train_acc = rs_bst.score(X_train, Y_train)
-print("Train Accuracy: ", train_acc)
+cat_clf = cb.CatBoostClassifier(**cat_params)
 
-# Validation Preds and Acc
-val_acc = rs_bst.score(X_val, Y_val)
-print("Validation Accuracy: ", val_acc)
+rs_cat_clf = RandomizedSearchCV(
+	estimator=cat_clf,
+	param_distributions=cat_param_grid,
+	n_iter=master_params['random_generations'],
+	cv=5,
+	scoring='accuracy',
+	n_jobs=-1,
+	random_state=RANDOM_SEED,
+	# return_train_score=True,
+	verbose=0
+)
 
-# Pred Prob Threshold
-val_probs = rs_bst.predict_proba(X_val)[:, 1]
+rs_cat_clf.fit(X_train, Y_train)
 
-best_thresh = 0.5
-best_acc = 0
+# LightGBM Classifier
+light_params = {
+	'max_depth': 3,
+	'min_gain_to_split': 0.25,
+	'n_estimators': 100,
+	'max_bin': 30,
+	'learning_rate': 0.09,
+	'random_state': [RANDOM_SEED],
+	'verbose': -1
+}
 
-# Test thresholds 0.1 to 0.9
-for thresh in np.arange(0.1, 0.9, 0.0001):
-	preds = (val_probs >= thresh).astype(int)
-	acc = np.mean(preds == Y_val)
-	if acc > best_acc:
-		best_acc = acc
-		best_thresh = thresh
+light_param_grid = {
+	'max_depth': master_params['max_depth'],
+	'min_gain_to_split': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
+	'n_estimators': master_params['n_estimators'],
+	'max_bin': [10, 20, 30, 40, 50],
+	'learning_rate':master_params['learning_rate'],
+	'random_state': [RANDOM_SEED]
+}
 
-print('Validation Accuracy with Threshold Adjustment: ', best_acc)
+light_clf = lgb.LGBMClassifier(**light_params)
+
+rs_light_clf = RandomizedSearchCV(
+	estimator=light_clf,
+	param_distributions=light_param_grid,
+	n_iter=master_params['random_generations'],
+	cv=5,
+	scoring='accuracy',
+	n_jobs=-1,
+	random_state=RANDOM_SEED,
+	# return_train_score=True,
+	verbose=0
+)
+
+rs_light_clf.fit(X_train, Y_train)
+
+# Threshold Optimization
+xgb_opt_thresh = 0
+cat_opt_thresh = 0
+light_opt_thresh = 0
+eclf_opt_thresh = 0
+
+print("rs_xgb_clf Best Params")
+pprint.pprint(rs_xgb_clf.best_estimator_.get_params())
+print("rs_cat_clf Best Params")
+pprint.pprint(rs_cat_clf.best_estimator_.get_params())
+print("rs_light_clf Best Params")
+pprint.pprint(rs_light_clf.best_estimator_.get_params())
+
+# Ensemble
+eclf = VotingClassifier(
+	estimators=[
+		('xgb', rs_xgb_clf.best_estimator_),
+		('cat', rs_cat_clf.best_estimator_),
+		('light', rs_light_clf.best_estimator_)
+	],
+	voting='soft',
+	weights=[1, 1, 1]
+)
+
+for clf in [rs_xgb_clf, rs_cat_clf, rs_light_clf, eclf]:
+	# Export hyperparameter data
+	# perf_df = pd.DataFrame(rs_xgb_clf.cv_results_)
+	# perf_df.to_csv('optimization.csv', index=False)
+
+	if clf == rs_xgb_clf:
+		print("\nXGB Classifier\n")
+	elif clf == rs_cat_clf:
+		print("\nCatBoost Classifier\n")
+	elif clf == rs_light_clf:
+		print("\nLightGBM Classifier\n")
+	else:
+		print("\nEnsemble Classifier\n")
+
+	if clf == eclf:
+		clf.fit(X_train, Y_train)
+
+	# Train Preds and Acc
+	train_pred = clf.predict(X_train)
+	train_acc = clf.score(X_train, Y_train)
+	print("Train Accuracy: ", train_acc)
+
+	# Validation Preds and Acc
+	val_acc = clf.score(X_val, Y_val)
+	print("Validation Accuracy: ", val_acc)
+
+	# Pred Prob Threshold
+	val_probs = clf.predict_proba(X_val)[:, 1]
+
+	best_thresh = 0.5
+	best_acc = 0
+
+	# Test thresholds 0.1 to 0.9
+	for thresh in np.arange(0.4, 0.6, 0.05):
+		preds = (val_probs >= thresh).astype(int)
+		acc = np.mean(preds == Y_val)
+		if acc > best_acc:
+			best_acc = acc
+			best_thresh = thresh
+
+	print('Validation Accuracy with Threshold Adjustment: ', best_acc)
+
+	# Assign Optimal Thresholds
+	if clf == rs_xgb_clf:
+		xgb_opt_thresh = best_thresh
+	elif clf == rs_cat_clf:
+		cat_opt_thresh = best_thresh
+	elif clf == rs_light_clf:
+		light_opt_thresh = best_thresh
+	elif clf == eclf:
+		eclf_opt_thresh = best_thresh
 
 # Recombine Training and Validation Data
-X_train = pd.concat([X_train, X_val])
-Y_train = pd.concat([Y_train, Y_val])
+X_comb = pd.concat([X_train, X_val])
+Y_comb = pd.concat([Y_train, Y_val])
 
-rs_bst.fit(X_train, Y_train)
-
-# Recombined Acc
-comb_acc = rs_bst.score(X_train, Y_train)
-print("Combined Accuracy: ", comb_acc)
+eclf.fit(X_comb, Y_comb)
 
 # Final Subission Preds
-test_probs = rs_bst.predict_proba(X_test)[:, 1]
-submission_preds = (test_probs >= best_thresh).astype(int)
+test_probs = eclf.predict_proba(X_test)[:, 1]
+submission_preds = (test_probs >= eclf_opt_thresh).astype(int)
 
 # Export Submission Data
 submission_df = pd.DataFrame({

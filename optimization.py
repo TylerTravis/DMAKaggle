@@ -324,6 +324,61 @@ pd.set_option('display.max_columns', None)
 
 # Session 44
 
+# ENSEMBLE
+#
+# XGB Classifier
+#
+# Train Accuracy:  0.8626155878467635
+# Validation Accuracy:  0.8134328358208955
+# Validation Accuracy with Threshold Adjustment:  0.8134328358208955
+#
+# CatBoost Classifier
+#
+# Train Accuracy:  0.8533685601056803
+# Validation Accuracy:  0.8059701492537313
+# Validation Accuracy with Threshold Adjustment:  0.8208955223880597
+#
+# LightGBM Classifier
+#
+# Train Accuracy:  0.8348745046235139
+# Validation Accuracy:  0.8283582089552238
+# Validation Accuracy with Threshold Adjustment:  0.8283582089552238
+#
+# Ensemble Classifier
+#
+# Train Accuracy:  0.8546895640686922
+# Validation Accuracy:  0.8134328358208955
+# Validation Accuracy with Threshold Adjustment:  0.8208955223880597
+
+# Session 45
+
+# Master Params
+
+# XGB Classifier
+#
+# Train Accuracy:  0.8599735799207398
+# Validation Accuracy:  0.8283582089552238
+# Validation Accuracy with Threshold Adjustment:  0.8283582089552238
+#
+# CatBoost Classifier
+#
+# Train Accuracy:  0.8533685601056803
+# Validation Accuracy:  0.8059701492537313
+# Validation Accuracy with Threshold Adjustment:  0.8208955223880597
+#
+# LightGBM Classifier
+#
+# Train Accuracy:  0.8348745046235139
+# Validation Accuracy:  0.8283582089552238
+# Validation Accuracy with Threshold Adjustment:  0.8283582089552238
+#
+# Ensemble Classifier
+#
+# Train Accuracy:  0.8560105680317041
+# Validation Accuracy:  0.8208955223880597
+# Validation Accuracy with Threshold Adjustment:  0.8208955223880597
+
+
 
 # Data
 opt_df = pd.read_csv('/Users/johnd/Desktop/Berkeley/DMA/kaggle/optimization.csv')
