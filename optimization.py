@@ -378,7 +378,35 @@ pd.set_option('display.max_columns', None)
 # Validation Accuracy:  0.8208955223880597
 # Validation Accuracy with Threshold Adjustment:  0.8208955223880597
 
+# Session 46 - REWIND.  PERHAPS ARTIFICIALLY INFLATED SCORES
 
+# XGB Classifier
+
+# Train Accuracy:  0.8745046235138706
+# Validation Accuracy:  0.8432835820895522
+# Validation Accuracy with Threshold Adjustment:  0.8582089552238806
+# Combined Accuracy:  0.867564534231201
+#
+# CatBoost Classifier
+#
+# Train Accuracy:  0.9088507265521797
+# Validation Accuracy:  0.8805970149253731
+# Validation Accuracy with Threshold Adjustment:  0.8880597014925373
+# Combined Accuracy:  0.9124579124579124
+#
+# LightGBM Classifier
+#
+# Train Accuracy:  0.8652575957727873
+# Validation Accuracy:  0.8432835820895522
+# Validation Accuracy with Threshold Adjustment:  0.8507462686567164
+# Combined Accuracy:  0.8630751964085297
+#
+# Ensemble Classifier
+#
+# Train Accuracy:  0.8903566710700133
+# Validation Accuracy:  0.8134328358208955
+# Validation Accuracy with Threshold Adjustment:  0.8432835820895522
+# Combined Accuracy:  0.9012345679012346
 
 # Data
 opt_df = pd.read_csv('/Users/johnd/Desktop/Berkeley/DMA/kaggle/optimization.csv')
