@@ -408,6 +408,89 @@ pd.set_option('display.max_columns', None)
 # Validation Accuracy with Threshold Adjustment:  0.8432835820895522
 # Combined Accuracy:  0.9012345679012346
 
+# Session 47 - MERGE
+
+# XGB Classifier
+#
+# Train Accuracy:  0.8758256274768824
+# Validation Accuracy:  0.835820895522388
+# Validation Accuracy with Threshold Adjustment:  0.8432835820895522
+#
+# CatBoost Classifier
+#
+# Train Accuracy:  0.8731836195508587
+# Validation Accuracy:  0.8208955223880597
+# Validation Accuracy with Threshold Adjustment:  0.8432835820895522
+#
+# LightGBM Classifier
+#
+# Train Accuracy:  0.8705416116248349
+# Validation Accuracy:  0.8134328358208955
+# Validation Accuracy with Threshold Adjustment:  0.8283582089552238
+#
+# Ensemble Classifier
+#
+# Train Accuracy:  0.8758256274768824
+# Validation Accuracy:  0.8208955223880597
+# Validation Accuracy with Threshold Adjustment:  0.8432835820895522
+# Combined Accuracy:  0.8720538720538721
+
+# Session 48 - Master Params
+
+# XGB Classifier
+#
+# Train Accuracy:  0.8731836195508587
+# Validation Accuracy:  0.8283582089552238
+# Validation Accuracy with Threshold Adjustment:  0.8507462686567164
+#
+# CatBoost Classifier
+#
+# Train Accuracy:  0.8348745046235139
+# Validation Accuracy:  0.8283582089552238
+# Validation Accuracy with Threshold Adjustment:  0.835820895522388
+#
+# LightGBM Classifier
+#
+# Train Accuracy:  0.8361955085865258
+# Validation Accuracy:  0.8283582089552238
+# Validation Accuracy with Threshold Adjustment:  0.8283582089552238
+#
+# Ensemble Classifier
+#
+# Train Accuracy:  0.8612945838837517
+# Validation Accuracy:  0.8283582089552238
+# Validation Accuracy with Threshold Adjustment:  0.835820895522388
+
+# Session 49
+
+# XGB Classifier
+#
+# Train Accuracy:  0.869220607661823
+# Validation Accuracy:  0.8134328358208955
+# Validation Accuracy with Threshold Adjustment:  0.8507462686567164
+#
+# CatBoost Classifier
+#
+# Train Accuracy:  0.8705416116248349
+# Validation Accuracy:  0.8208955223880597
+# Validation Accuracy with Threshold Adjustment:  0.8507462686567164
+#
+# LightGBM Classifier
+#
+# Train Accuracy:  0.8665785997357992
+# Validation Accuracy:  0.8134328358208955
+# Validation Accuracy with Threshold Adjustment:  0.8432835820895522
+#
+# Ensemble Classifier
+#
+# Train Accuracy:  0.8705416116248349
+# Validation Accuracy:  0.8134328358208955
+# Validation Accuracy with Threshold Adjustment:  0.8432835820895522
+
+# Session 50
+
+
+
 # Data
 opt_df = pd.read_csv('/Users/johnd/Desktop/Berkeley/DMA/kaggle/optimization.csv')
 

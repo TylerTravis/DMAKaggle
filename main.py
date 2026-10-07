@@ -43,6 +43,10 @@ def process_data(df):
 	# Sex
 	df['Sex'] = df['Sex'].map({'male': 0, 'female': 1})
 
+	# Class
+	pclass_dummies = pd.get_dummies(df['Pclass'], prefix='Pclass', dtype=int)
+	df = pd.concat([df, pclass_dummies], axis=1)
+
 	# Name / Title
 	df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
 	df['Title'] = df['Title'].replace(['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer'], 'Rare')
@@ -60,12 +64,14 @@ def process_data(df):
 	cabin_dummies = pd.get_dummies(df['Cabin'].str[0], prefix='Cabin', dummy_na=True, dtype=int)
 	df = pd.concat([df, cabin_dummies], axis=1)
 
+	# Fare
+	df['Fare'] = np.log1p(df['Fare'])
+
 	# Feature Engineering
 	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
 	# df['IsAlone'] = df['FamilySize'].apply(lambda x: int(x == 1))
 	# df['FarePerPerson'] = df['Fare'] / df['FamilySize']
 	df['IsChild'] = df['Age'].apply(lambda x: int(x < 15))
-
 
 
 	return df
@@ -87,6 +93,17 @@ X_train, X_val, Y_train, Y_val = train_test_split(
 	X_train, Y_train, test_size=0.15, random_state=RANDOM_SEED
 )
 
+master_params = {
+	'random_generations': 125,
+	'max_depth': [3, 4],
+	'learning_rate': [0.025, 0.05, 0.075],
+	'n_estimators': [100, 110, 120],
+	'min_child_weight': [4, 5, 6],
+	'subsample': [0.6, 0.7, 0.8, 0.9],
+	'l1_leaf_reg': [0, 0.01, 0.1],
+	'l2_leaf_reg': [1, 1.5, 2, 2.5, 3.0]
+}
+
 # XGB Classifier
 xgb_params = {
 	'max_depth': 4,
@@ -103,25 +120,24 @@ xgb_params = {
 }
 
 xgb_param_grid = {
-	'max_depth': [3, 4],
-	'learning_rate': [0.025, 0.05, 0.075],
-	'n_estimators': [100, 125, 150],
-	'min_child_weight': [4, 5, 6],
-	'subsample': [0.6, 0.7, 0.8, 0.9],
-	'colsample_bytree': [0.6, 0.7, 0.8, 0.9],
+
+	'max_depth': master_params['max_depth'],
+	'learning_rate': master_params['learning_rate'],
+	'n_estimators': master_params['n_estimators'],
+	'min_child_weight': master_params['min_child_weight'],
+	'subsample': master_params['subsample'],
+	'colsample_bytree': master_params['subsample'],
 	'gamma': [0, 0.1, 0.25, 0.5],
-	'reg_alpha': [0, 0.01, 0.1],
-	'reg_lambda': [1, 1.5, 2]
+	'reg_alpha': master_params['l1_leaf_reg'],
+	'reg_lambda': master_params['l2_leaf_reg']
 }
 
 xgb_clf = xgb.XGBClassifier(**xgb_params)
 
-xgb_n_iter = 125
-
 rs_xgb_clf = RandomizedSearchCV(
 	estimator=xgb_clf,
 	param_distributions=xgb_param_grid,
-	n_iter=xgb_n_iter,
+	n_iter=master_params['random_generations'],
 	cv=5,
 	scoring='accuracy',
 	n_jobs=-1,
@@ -148,23 +164,21 @@ cat_params = {
 cat_param_grid = {
 	'objective': ['Logloss'],
 	'eval_metric': ['Accuracy'],
-	'depth': [3, 4, 5],
-	'learning_rate': [0.025, 0.05, 0.075],
-	'iterations': [100, 125, 150],
-	'min_data_in_leaf': [4, 5, 6],
-	'subsample': [0.6, 0.7, 0.8, 0.9],
-	'l2_leaf_reg': [1, 1.5, 2, 2.5, 3.0],
+	'depth': master_params['max_depth'],
+	'learning_rate': master_params['learning_rate'],
+	'iterations': master_params['n_estimators'],
+	'min_data_in_leaf': master_params['min_child_weight'],
+	'subsample':master_params['subsample'],
+	'l2_leaf_reg': master_params['l2_leaf_reg'],
 	'random_state': [RANDOM_SEED],
 }
 
 cat_clf = cb.CatBoostClassifier(**cat_params)
 
-cat_n_iter = 125
-
 rs_cat_clf = RandomizedSearchCV(
 	estimator=cat_clf,
 	param_distributions=cat_param_grid,
-	n_iter=cat_n_iter,
+	n_iter=master_params['random_generations'],
 	cv=5,
 	scoring='accuracy',
 	n_jobs=-1,
@@ -179,7 +193,7 @@ rs_cat_clf.fit(X_train, Y_train)
 light_params = {
 	'max_depth': 3,
 	'min_gain_to_split': 0.25,
-	'num_iterations': 100,
+	'n_estimators': 100,
 	'max_bin': 30,
 	'learning_rate': 0.09,
 	'random_state': [RANDOM_SEED],
@@ -187,22 +201,20 @@ light_params = {
 }
 
 light_param_grid = {
-	'max_depth': [3, 4, 5],
+	'max_depth': master_params['max_depth'],
 	'min_gain_to_split': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
-	'num_iterations': [100, 125, 150],
+	'n_estimators': master_params['n_estimators'],
 	'max_bin': [10, 20, 30, 40, 50],
-	'learning_rate': [0.01, 0.05, 0.1, 0.2],
-	'random_state': [RANDOM_SEED],
+	'learning_rate':master_params['learning_rate'],
+	'random_state': [RANDOM_SEED]
 }
 
 light_clf = lgb.LGBMClassifier(**light_params)
 
-light_n_iter = 125
-
 rs_light_clf = RandomizedSearchCV(
 	estimator=light_clf,
 	param_distributions=light_param_grid,
-	n_iter=light_n_iter,
+	n_iter=master_params['random_generations'],
 	cv=5,
 	scoring='accuracy',
 	n_jobs=-1,
