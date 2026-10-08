@@ -640,7 +640,7 @@ pd.set_option('display.max_columns', None)
 # Train Accuracy:  0.8639365918097754
 # Validation Accuracy:  0.835820895522388
 
-# FEATURE ENGINEERING ROUND THREE
+# Session 61 - FEATURE ENGINEERING ROUND THREE
 
 # XGB Classifier
 # Train Accuracy:  0.8560105680317041
@@ -658,6 +658,28 @@ pd.set_option('display.max_columns', None)
 # Train Accuracy:  0.857331571994716
 # Validation Accuracy:  0.835820895522388
 
+# Session 62
+
+# Notes:
+# IsChildAndFamilyMemberSurvived mainly benefits XGB.
+# Variability with child age cutoff is worth exploring further in conjunction with other variables.
+# Adding "Mrs" to rare titles helps Cat but not others
+
+# XGB Classifier
+# Train Accuracy:  0.8533685601056803
+# Validation Accuracy:  0.8507462686567164
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8375165125495376
+# Validation Accuracy:  0.8432835820895522
+#
+# LightGBM Classifier
+# Train Accuracy:  0.8599735799207398
+# Validation Accuracy:  0.8432835820895522
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8586525759577279
+# Validation Accuracy:  0.8432835820895522
 
 
 # Data

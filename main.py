@@ -56,11 +56,35 @@ def calculate_group_survival(df):
 
 	return copy.apply(lambda x: get_companion_survival_rate(x.name, x['LastName'], x['Ticket']), axis=1)
 
+def calculate_same_ticket_survival(df):
+	copy = df.copy()
+	copy['LastName'] = copy['Name'].str.extract(r'([A-Za-z]+),', expand=False)
+
+	def get_companion_survival_rate(passenger_id, last_name, ticket):
+		companions = copy[
+			((copy['Ticket'] == ticket)) &
+			(copy.index != passenger_id)
+			]
+
+		companions = companions.dropna(subset=['Survived'])
+
+		if len(companions) > 0:
+			return companions['Survived'].mean()
+		else:
+			return -1
+
+	return copy.apply(lambda x: get_companion_survival_rate(x.name, x['LastName'], x['Ticket']), axis=1)
+
 all_data = pd.concat([train_df, test_df])
 
 all_data['GroupSurvivalRate'] = calculate_group_survival(all_data)
+all_data['SameTicketSurvivalRate'] = calculate_same_ticket_survival(all_data)
+
 train_df['GroupSurvivalRate'] = all_data['GroupSurvivalRate'].iloc[:len(train_df)]
 test_df['GroupSurvivalRate'] = all_data['GroupSurvivalRate'].iloc[len(train_df):]
+
+train_df['SameTicketSurvivalRate'] = all_data['SameTicketSurvivalRate'].iloc[:len(train_df)]
+test_df['SameTicketSurvivalRate'] = all_data['SameTicketSurvivalRate'].iloc[len(train_df):]
 
 def process_data(df):
 	# Imputation
@@ -113,7 +137,7 @@ def process_data_for_decision_tree(df):
 	df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
 
 	df['Title'] = df['Title'].replace(
-		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer'], 'Rare')
+		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mrs'], 'Rare')
 
 	# Embarked
 	df['Embarked'] = df['Embarked'].astype('category').cat.codes
@@ -121,15 +145,14 @@ def process_data_for_decision_tree(df):
 	# Cabin
 	# df['Cabin'] = df['Cabin'].str.extract(r'([A-Za-z])', expand=False).astype('category').cat.codes
 
-	# Family Survival Detection
-
 	# Added Features
 	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
-	df['IsChild'] = df['Age'].apply(lambda x: int(x < 15))
-	df['HasCabin'] = df['Cabin'].notnull().astype(int)
+	df['IsChild'] = df['Age'].apply(lambda x: int(x < 14))
+	df['HasCabin'] = df['Cabin'].notna().astype(int)
 	df['RareTitle'] = df['Title'].apply(lambda x: int(x == 'Rare'))
 	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 40))
-	df['IsNotAlone'] = df['FamilySize'].apply(lambda x: int(x == 1))
+	df['WhyTFDoesThisWork'] = df['FamilySize'].apply(lambda x: int(x >= 1))
+	# df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
 
 	return df
 
@@ -157,8 +180,8 @@ master_params = {
 	'min_child_weight': 4,
 	'subsample': 0.6,
 	'colsample_bytree': 0.75,
-	'l1_leaf_reg': 0.075,
-	'l2_leaf_reg': 1,
+	'l1_leaf_reg': 0,
+	'l2_leaf_reg': 0,
 	'random_state': RANDOM_SEED,
 	'eval_metric': 'logloss'
 }
@@ -238,8 +261,10 @@ light_params = {
 	'boosting': 'gbdt',
 	'data_sample_strategy': 'bagging',
 	'objective': 'binary',
+	'lambda_l1': 0,
+	'lambda_l2': 0,
 	'max_depth': master_params['max_depth'],
-	'min_gain_to_split': 0.25,
+	'min_gain_to_split': 0.3,
 	'n_estimators': master_params['n_estimators'],
 	'max_bin': 30,
 	'learning_rate': master_params['learning_rate'],
@@ -268,7 +293,6 @@ eclf = VotingClassifier(
 	voting='soft',
 	weights=[1, 1, 3]
 )
-
 
 OPTIMIZING = False
 DEEP_OPTIMIZING = False
@@ -322,7 +346,7 @@ if OPTIMIZING:
 			('light', rs_light_clf.best_estimator_)
 		],
 		voting='soft',
-		weights=[1, 1, 1]
+		weights=[1.5, 1, 1.5]
 	)
 
 	# Model Accuracies
@@ -482,7 +506,6 @@ else:
 		val_acc = clf.score(X_val, Y_val)
 		print("Validation Accuracy: ", val_acc)
 
-
 # Recombine Training and Validation Data
 X_train = pd.concat([X_train, X_val])
 Y_train = pd.concat([Y_train, Y_val])
@@ -504,10 +527,10 @@ Y_train = pd.concat([Y_train, Y_val])
 # 	clf = eclf
 # 	opt_thresh = ens_opt_thresh
 
-light_clf.fit(X_train, Y_train)
+xgb_clf.fit(X_train, Y_train)
 
 # Final Subission Preds
-submission_preds = light_clf.predict(X_test)
+submission_preds = xgb_clf.predict(X_test)
 
 # Export Submission Data
 submission_df = pd.DataFrame({
