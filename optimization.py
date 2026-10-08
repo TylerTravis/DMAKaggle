@@ -681,6 +681,80 @@ pd.set_option('display.max_columns', None)
 # Train Accuracy:  0.8586525759577279
 # Validation Accuracy:  0.8432835820895522
 
+# Session 63
+
+# XGB Classifier - With Mrs
+# Train Accuracy:  0.8626155878467635
+# Validation Accuracy:  0.8507462686567164
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8494055482166446
+# Validation Accuracy:  0.8432835820895522
+#
+# LightGBM Classifier
+# Train Accuracy:  0.8599735799207398
+# Validation Accuracy:  0.8507462686567164
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8626155878467635
+# Validation Accuracy:  0.8582089552238806
+
+# Session 64
+
+# XGB Classifier
+# Train Accuracy:  0.8507265521796565
+# Validation Accuracy:  0.8656716417910447
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8441215323645971
+# Validation Accuracy:  0.8507462686567164
+#
+# LightGBM Classifier
+# Train Accuracy:  0.857331571994716
+# Validation Accuracy:  0.8582089552238806
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8546895640686922
+# Validation Accuracy:  0.8582089552238806
+
+# 65
+
+# IsChild Cutoff: <15
+
+# XGB Classifier
+# Train Accuracy:  0.8533685601056803
+# Validation Accuracy:  0.8656716417910447
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8428005284015853
+# Validation Accuracy:  0.8432835820895522
+#
+# LightGBM Classifier
+# Train Accuracy:  0.8586525759577279
+# Validation Accuracy:  0.8582089552238806
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8546895640686922
+# Validation Accuracy:  0.8582089552238806
+
+# IsChild Cutoff: <13
+
+# XGB Classifier
+# Train Accuracy:  0.8507265521796565
+# Validation Accuracy:  0.8656716417910447
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8414795244385733
+# Validation Accuracy:  0.8432835820895522
+#
+# LightGBM Classifier
+# Train Accuracy:  0.857331571994716
+# Validation Accuracy:  0.8582089552238806
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8560105680317041
+# Validation Accuracy:  0.8582089552238806
+
 
 # Data
 opt_df = pd.read_csv('/Users/johnd/Desktop/Berkeley/DMA/kaggle/optimization.csv')

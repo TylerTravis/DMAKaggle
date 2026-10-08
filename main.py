@@ -107,6 +107,8 @@ def process_data(df):
 	df['Title'] = df['Title'].replace(['Mlle', 'Ms'], 'Miss')
 	df['Title'] = df['Title'].replace('Mme', 'Mrs')
 
+
+
 	title_dummies = pd.get_dummies(df['Title'], prefix='Title', dtype=int)
 	df = pd.concat([df, title_dummies], axis=1)
 
@@ -129,7 +131,7 @@ def process_data(df):
 
 	return df
 
-def process_data_for_decision_tree(df):
+def process_data_for_decision_tree(df, model):
 	# Sex
 	df['Sex'] = df['Sex'].map({'male': 0, 'female': 1})
 
@@ -137,7 +139,7 @@ def process_data_for_decision_tree(df):
 	df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
 
 	df['Title'] = df['Title'].replace(
-		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mrs'], 'Rare')
+		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mrs', 'Miss', "Mlle"], '"HighValue"')
 
 	# Embarked
 	df['Embarked'] = df['Embarked'].astype('category').cat.codes
@@ -146,31 +148,55 @@ def process_data_for_decision_tree(df):
 	# df['Cabin'] = df['Cabin'].str.extract(r'([A-Za-z])', expand=False).astype('category').cat.codes
 
 	# Added Features
+
+
 	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
-	df['IsChild'] = df['Age'].apply(lambda x: int(x < 14))
+
+	if model == 'xgb':
+		df['IsChild'] = df['Age'].apply(lambda x: int(x < 9))
+	if model == 'cat':
+		df['IsChild'] = df['Age'].apply(lambda x: int(x < 11))
+	elif model == 'light':
+		df['IsChild'] = df['Age'].apply(lambda x: int(x < 15))
+
 	df['HasCabin'] = df['Cabin'].notna().astype(int)
-	df['RareTitle'] = df['Title'].apply(lambda x: int(x == 'Rare'))
+
+	df['RareTitle'] = df['Title'].apply(lambda x: int(x == '"HighValue"'))
+
 	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 40))
+
 	df['WhyTFDoesThisWork'] = df['FamilySize'].apply(lambda x: int(x >= 1))
-	# df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
+
+	if model == 'xgb':
+		df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
 
 	return df
 
-X_train = process_data_for_decision_tree(train_df)
-X_test = process_data_for_decision_tree(test_df)
+# Light cutoff 13
+# Train Accuracy:  0.857331571994716
+# Validation Accuracy:  0.8582089552238806
 
-cols_to_drop = ['Name', 'Title', 'Cabin', 'Ticket', 'Fare', 'FamilySize']
+xgb_X_train = process_data_for_decision_tree(train_df, 'xgb')
+xgb_X_test = process_data_for_decision_tree(test_df, 'xgb')
+
+cat_X_train = process_data_for_decision_tree(train_df, 'cat')
+cat_X_test = process_data_for_decision_tree(test_df, 'cat')
+
+light_X_train = process_data_for_decision_tree(train_df, 'light')
+light_X_test = process_data_for_decision_tree(test_df, 'light')
+
+cols_to_drop = ['Name', 'Title', 'Cabin', 'Ticket', 'Fare', 'FamilySize', 'PassengerId']
 
 # Test & Train
-X_train = X_train.drop(columns=['Survived', 'PassengerId'] + cols_to_drop)
+X_train = X_train.drop(columns=['Survived'] + cols_to_drop)
 Y_train = train_df['Survived']
 
-X_test = X_test.drop(columns=['PassengerId'] + cols_to_drop)
+X_test = X_test.drop(columns=cols_to_drop)
 X_test = X_test.reindex(columns=X_train.columns, fill_value=0)
 
 # Validation Split
-X_train, X_val, Y_train, Y_val = train_test_split(
-	X_train, Y_train, test_size=0.15, random_state=RANDOM_SEED
+xgb_X_train, xgb_X_val, xgb_Y_train, xgb_Y_val = train_test_split(
+	xgb_X_train, Y_train, test_size=0.15, random_state=RANDOM_SEED
 )
 
 master_params = {
@@ -486,6 +512,8 @@ elif DEEP_OPTIMIZING:
 	all_grid_results.to_csv('optimization.csv', index=False)
 else:
 	for clf in [xgb_clf, cat_clf, light_clf, eclf]:
+
+
 		clf.fit(X_train, Y_train)
 
 		if clf == xgb_clf:
