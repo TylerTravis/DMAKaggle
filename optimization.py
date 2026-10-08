@@ -489,6 +489,175 @@ pd.set_option('display.max_columns', None)
 
 # Session 50
 
+# Data processing change
+# Removed Threshold tuning
+
+# XGB Classifier
+#
+# Train Accuracy:  0.8797886393659181
+# Validation Accuracy:  0.8283582089552238
+#
+# CatBoost Classifier
+#
+# Train Accuracy:  0.8718626155878467
+# Validation Accuracy:  0.8283582089552238
+#
+# LightGBM Classifier
+#
+# Train Accuracy:  0.8665785997357992
+# Validation Accuracy:  0.8134328358208955
+#
+# Ensemble Classifier
+#
+# Train Accuracy:  0.8718626155878467
+# Validation Accuracy:  0.8208955223880597
+
+# Session 51
+
+# Data processing change
+# Removed Threshold tuning
+
+# XGB Classifier
+#
+# Train Accuracy:  0.8797886393659181
+# Validation Accuracy:  0.8283582089552238
+#
+# CatBoost Classifier
+#
+# Train Accuracy:  0.8718626155878467
+# Validation Accuracy:  0.8283582089552238
+#
+# LightGBM Classifier
+#
+# Train Accuracy:  0.8665785997357992
+# Validation Accuracy:  0.8134328358208955
+#
+# Ensemble Classifier
+#
+# Train Accuracy:  0.8718626155878467
+# Validation Accuracy:  0.8208955223880597
+
+# Session 52
+# Min-Child-Weight 4,5,6 -> 5,6,7
+
+# XGB Classifier
+# Train Accuracy:  0.8507265521796565
+# Validation Accuracy:  0.8208955223880597
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8626155878467635
+# Validation Accuracy:  0.8134328358208955
+#
+# LightGBM Classifier
+# Train Accuracy:  0.8612945838837517
+# Validation Accuracy:  0.8283582089552238
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8652575957727873
+# Validation Accuracy:  0.8059701492537313
+
+# Session 53 - fine tuning
+
+# XGB Classifier
+# Train Accuracy:  0.8520475561426685
+# Validation Accuracy:  0.7985074626865671
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8507265521796565
+# Validation Accuracy:  0.835820895522388
+#
+# LightGBM Classifier
+# Train Accuracy:  0.8612945838837517
+# Validation Accuracy:  0.8208955223880597
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8652575957727873
+# Validation Accuracy:  0.8208955223880597
+
+# Session 54 - fine tuning
+
+# XGB Classifier
+# Train Accuracy:  0.8665785997357992
+# Validation Accuracy:  0.8208955223880597
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8797886393659181
+# Validation Accuracy:  0.8208955223880597
+#
+# LightGBM Classifier
+# Train Accuracy:  0.8652575957727873
+# Validation Accuracy:  0.8208955223880597
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8731836195508587
+# Validation Accuracy:  0.8134328358208955
+
+# Session 55
+
+# XGB Classifier
+# Train Accuracy:  0.8520475561426685
+# Validation Accuracy:  0.7985074626865671
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8507265521796565
+# Validation Accuracy:  0.835820895522388
+#
+# LightGBM Classifier
+# Train Accuracy:  0.8612945838837517
+# Validation Accuracy:  0.8208955223880597
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8652575957727873
+# Validation Accuracy:  0.8208955223880597
+
+# Session 56 - Hard Voting
+
+# Ensemble Classifier
+# Train Accuracy:  0.8665785997357992
+# Validation Accuracy:  0.8134328358208955
+
+# Session 57 - Soft Voting
+
+# Ensemble Classifier
+# Train Accuracy:  0.8665785997357992
+# Validation Accuracy:  0.8134328358208955
+
+# Session 58 - Soft Voting - weights [0.9, 1.1, 1]
+#
+# Ensemble Classifier
+# Train Accuracy:  0.8652575957727873
+# Validation Accuracy:  0.8208955223880597
+
+# Session 59 - Soft Voting - weights [0.5, 1.5, 1]
+
+# Ensemble Classifier
+# Train Accuracy:  0.8639365918097754
+# Validation Accuracy:  0.8283582089552238
+
+# Session 60 - Soft Voting - weights [0.4, 1.6, 1]
+
+# Ensemble Classifier
+# Train Accuracy:  0.8639365918097754
+# Validation Accuracy:  0.835820895522388
+
+# FEATURE ENGINEERING ROUND THREE
+
+# XGB Classifier
+# Train Accuracy:  0.8560105680317041
+# Validation Accuracy:  0.8432835820895522
+#
+# CatBoost Classifier
+# Train Accuracy:  0.8309114927344782
+# Validation Accuracy:  0.8283582089552238
+#
+# LightGBM Classifier
+# Train Accuracy:  0.8599735799207398
+# Validation Accuracy:  0.8507462686567164
+#
+# Ensemble Classifier
+# Train Accuracy:  0.857331571994716
+# Validation Accuracy:  0.835820895522388
+
 
 
 # Data
