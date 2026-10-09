@@ -1,23 +1,22 @@
 # General
-import catboost
 import kagglehub
 import pandas as pd
 import numpy as np
 import random
 
-# SKLearn
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import GridSearchCV
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import VotingClassifier
+# Sklearn
+from sklearn.ensemble import VotingClassifier, StackingClassifier, RandomForestClassifier, ExtraTreesClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, train_test_split
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 
-# Models
+# Other Models
 import xgboost as xgb
 import catboost as cb
 import lightgbm as lgb
 
 RANDOM_SEED = 42
-
 random.seed(RANDOM_SEED)
 
 pd.set_option('display.max_columns', None)
@@ -28,8 +27,6 @@ pd.set_option('display.width', 1000)
 
 train_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/train.csv')
 test_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/test.csv')
-
-print(train_df)
 
 test_passenger_ids = test_df['PassengerId']
 
@@ -139,7 +136,7 @@ def process_data_for_decision_tree(df, model=''):
 	df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
 
 	df['Title'] = df['Title'].replace(
-		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mrs', 'Miss'], 'Rare')
+		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mrs', 'Miss', 'Mlle', 'Ms'], 'Rare')
 	# Embarked
 	df['Embarked'] = df['Embarked'].astype('category').cat.codes
 
@@ -175,7 +172,10 @@ X_train, X_val, Y_train, Y_val = train_test_split(
 	X_train, Y_train, test_size=0.15, random_state=RANDOM_SEED
 )
 
-master_params = {
+# BASE MODELS
+
+# Gradient Boosting Params
+gb_params = {
 	'max_depth': 3,
 	'learning_rate': 0.05,
 	'n_estimators': 70,
@@ -188,7 +188,7 @@ master_params = {
 	'eval_metric': 'logloss'
 }
 
-master_param_grid = {
+gb_param_grid = {
 	'random_generations': 115,
 	'max_depth': [3],
 	'learning_rate': [0.075],
@@ -201,29 +201,29 @@ master_param_grid = {
 
 # XGB Classifier
 xgb_params = {
-	'max_depth': master_params['max_depth'],
-	'learning_rate': master_params['learning_rate'],
-	'n_estimators': master_params['n_estimators'],
-	'min_child_weight': master_params['min_child_weight'],
-	'subsample': master_params['subsample'],
-	'colsample_bytree': master_params['colsample_bytree'],
+	'max_depth': gb_params['max_depth'],
+	'learning_rate': gb_params['learning_rate'],
+	'n_estimators': gb_params['n_estimators'],
+	'min_child_weight': gb_params['min_child_weight'],
+	'subsample': gb_params['subsample'],
+	'colsample_bytree': gb_params['colsample_bytree'],
 	'gamma': 0.175,
-	'reg_alpha': master_params['l1_leaf_reg'],
-	'reg_lambda': master_params['l2_leaf_reg'],
-	'random_state': RANDOM_SEED,
-	'eval_metric': master_params['eval_metric']
+	'reg_alpha': gb_params['l1_leaf_reg'],
+	'reg_lambda': gb_params['l2_leaf_reg'],
+	'random_state': gb_params['random_state'],
+	'eval_metric': gb_params['eval_metric'],
 }
 
 xgb_param_grid = {
-	'max_depth': master_param_grid['max_depth'],
-	'learning_rate': master_param_grid['learning_rate'],
-	'n_estimators': master_param_grid['n_estimators'],
-	'min_child_weight': master_param_grid['min_child_weight'],
-	'subsample': master_param_grid['subsample'],
-	'colsample_bytree': master_param_grid['subsample'],
+	'max_depth': gb_param_grid['max_depth'],
+	'learning_rate': gb_param_grid['learning_rate'],
+	'n_estimators': gb_param_grid['n_estimators'],
+	'min_child_weight': gb_param_grid['min_child_weight'],
+	'subsample': gb_param_grid['subsample'],
+	'colsample_bytree': gb_param_grid['subsample'],
 	'gamma': [0, 0.1, 0.25, 0.5],
-	'reg_alpha': master_param_grid['l1_leaf_reg'],
-	'reg_lambda': master_param_grid['l2_leaf_reg']
+	'reg_alpha': gb_param_grid['l1_leaf_reg'],
+	'reg_lambda': gb_param_grid['l2_leaf_reg']
 }
 
 xgb_clf = xgb.XGBClassifier(**xgb_params)
@@ -231,14 +231,14 @@ xgb_clf = xgb.XGBClassifier(**xgb_params)
 # CatBoost Classifier
 cat_params = {
 	'objective': 'Logloss',
-	'random_state': RANDOM_SEED,
+	'random_state': gb_params['random_state'],
 	'eval_metric': 'Accuracy',
-	'iterations': master_params['n_estimators'],
-	'min_data_in_leaf': master_params['min_child_weight'],
-	'learning_rate': master_params['learning_rate'],
-	'l2_leaf_reg': master_params['l2_leaf_reg'],
-	'subsample': master_params['subsample'],
-	'depth': master_params['max_depth'],
+	'iterations': gb_params['n_estimators'],
+	'min_data_in_leaf': gb_params['min_child_weight'],
+	'learning_rate': gb_params['learning_rate'],
+	'l2_leaf_reg': gb_params['l2_leaf_reg'],
+	'subsample': gb_params['subsample'],
+	'depth': gb_params['max_depth'],
 	'verbose': 0,
 	'od_type': 'Iter'
 }
@@ -246,12 +246,12 @@ cat_params = {
 cat_param_grid = {
 	'objective': ['Logloss'],
 	'eval_metric': ['Accuracy'],
-	'depth': master_param_grid['max_depth'],
-	'learning_rate': master_param_grid['learning_rate'],
-	'iterations': master_param_grid['n_estimators'],
-	'min_data_in_leaf': master_param_grid['min_child_weight'],
-	'subsample':master_param_grid['subsample'],
-	'l2_leaf_reg': master_param_grid['l2_leaf_reg'],
+	'depth': gb_param_grid['max_depth'],
+	'learning_rate': gb_param_grid['learning_rate'],
+	'iterations': gb_param_grid['n_estimators'],
+	'min_data_in_leaf': gb_param_grid['min_child_weight'],
+	'subsample':gb_param_grid['subsample'],
+	'l2_leaf_reg': gb_param_grid['l2_leaf_reg'],
 	'random_state': [RANDOM_SEED],
 }
 
@@ -265,35 +265,126 @@ light_params = {
 	'objective': 'binary',
 	'lambda_l1': 0,
 	'lambda_l2': 0,
-	'max_depth': master_params['max_depth'],
+	'max_depth': gb_params['max_depth'],
 	'min_gain_to_split': 0.3,
-	'n_estimators': master_params['n_estimators'],
+	'n_estimators': gb_params['n_estimators'],
 	'max_bin': 30,
-	'learning_rate': master_params['learning_rate'],
-	'random_state': [RANDOM_SEED],
-	'verbose': -1
+	'learning_rate': gb_params['learning_rate'],
+	'verbose': -1,
+	'random_state': gb_params['random_state']
 }
 
 light_param_grid = {
-	'max_depth': master_param_grid['max_depth'],
+	'max_depth': gb_param_grid['max_depth'],
 	'min_gain_to_split': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
-	'n_estimators': master_param_grid['n_estimators'],
+	'n_estimators': gb_param_grid['n_estimators'],
 	'max_bin': [10, 20, 30, 40, 50],
-	'learning_rate':master_param_grid['learning_rate'],
+	'learning_rate':gb_param_grid['learning_rate'],
 	'random_state': [RANDOM_SEED]
 }
 
 light_clf = lgb.LGBMClassifier(**light_params)
+
+# Random Forest
+rf_params = {
+	'n_estimators': 100,
+	'max_depth': 3,
+	'random_state': RANDOM_SEED
+}
+
+rf_param_grid = {
+	'n_estimators': [50, 100, 150, 200],
+	'max_depth': [3, 5, 7, 9],
+	'min_samples_split': [2, 5, 10],
+	'min_samples_leaf': [1, 2, 4],
+	'max_features': ['sqrt', 'log2'],
+	'bootstrap': [True, False]
+}
+
+rf_clf = RandomForestClassifier(**rf_params)
+
+# Extra Trees
+et_params = {
+	'n_estimators': 100,
+	'max_depth': 3,
+	'random_state': RANDOM_SEED
+}
+
+et_param_grid = {
+	'n_estimators': [50, 100, 150, 200],
+	'max_depth': [3, 5, 7, 9],
+	'min_samples_split': [2, 5, 10],
+	'min_samples_leaf': [1, 2, 4],
+	'max_features': ['sqrt', 'log2'],
+	'bootstrap': [True, False]
+}
+
+et_clf = ExtraTreesClassifier(**et_params)
+
+# SVC
+svc_params = {
+	'C': 1,
+	'kernel': 'linear',
+	'gamma': 'scale',
+	'probability': True,
+	'random_state': RANDOM_SEED
+}
+
+svc_param_grid = {
+	'C': [0.1, 1, 10, 100],
+	'kernel': ['linear', 'rbf'],
+	'gamma': ['scale', 'auto'],
+	'probability': [True],
+	'random_state': [RANDOM_SEED]
+}
+
+svc_clf = SVC(**svc_params)
+
+# K Nearest Neighbors
+knn_params = {
+	'n_neighbors': 5,
+	'weights': 'uniform',
+	'algorithm': 'auto',
+	'leaf_size': 30,
+	'p': 2,
+	'n_jobs': -1
+}
+
+knn_param_grid = {
+	'n_neighbors': [3, 5, 7, 9, 11],
+	'weights': ['uniform', 'distance'],
+	'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'],
+	'leaf_size': [10, 20, 30, 40, 50],
+	'p': [1, 2],
+	'n_jobs': [-1]
+}
+
+knn_clf = KNeighborsClassifier(**knn_params)
 
 # Ensemble
 eclf = VotingClassifier(
 	estimators=[
 		('xgb', xgb_clf),
 		('cat', cat_clf),
-		('light', light_clf)
+		('light', light_clf),
 	],
-	voting='hard',
+	voting='soft',
 	weights=[1, 1, 1]
+)
+
+sclf = StackingClassifier(
+	estimators=[
+		('xgb', xgb_clf),
+		('cat', cat_clf),
+		('light', light_clf),
+		('rf', rf_clf),
+		('et', et_clf),
+		('svc', svc_clf),
+		('knn', knn_clf)
+	],
+	final_estimator=LogisticRegression(),
+	cv=5,
+	n_jobs=-1
 )
 
 OPTIMIZING = False
@@ -303,7 +394,7 @@ if OPTIMIZING:
 	rs_xgb_clf = RandomizedSearchCV(
 		estimator=xgb_clf,
 		param_distributions=xgb_param_grid,
-		n_iter=master_param_grid['random_generations'],
+		n_iter=gb_param_grid['random_generations'],
 		cv=5,
 		scoring='accuracy',
 		n_jobs=-1,
@@ -315,7 +406,7 @@ if OPTIMIZING:
 	rs_cat_clf = RandomizedSearchCV(
 		estimator=cat_clf,
 		param_distributions=cat_param_grid,
-		n_iter=master_param_grid['random_generations'],
+		n_iter=gb_param_grid['random_generations'],
 		cv=5,
 		scoring='accuracy',
 		n_jobs=-1,
@@ -329,7 +420,7 @@ if OPTIMIZING:
 	rs_light_clf = RandomizedSearchCV(
 		estimator=light_clf,
 		param_distributions=light_param_grid,
-		n_iter=master_param_grid['random_generations'],
+		n_iter=gb_param_grid['random_generations'],
 		cv=5,
 		scoring='accuracy',
 		n_jobs=-1,
@@ -487,7 +578,7 @@ elif DEEP_OPTIMIZING:
 	all_grid_results = pd.concat([xgb_results, cat_results, light_results], ignore_index=True)
 	all_grid_results.to_csv('optimization.csv', index=False)
 else:
-	for clf in [xgb_clf, cat_clf, light_clf, eclf]:
+	for clf in [xgb_clf, cat_clf, light_clf, eclf, sclf]:
 		clf.fit(X_train, Y_train)
 
 		if clf == xgb_clf:
