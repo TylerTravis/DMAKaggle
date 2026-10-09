@@ -29,6 +29,8 @@ pd.set_option('display.width', 1000)
 train_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/train.csv')
 test_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/test.csv')
 
+print(train_df)
+
 test_passenger_ids = test_df['PassengerId']
 
 # Imputation Values
@@ -129,7 +131,7 @@ def process_data(df):
 
 	return df
 
-def process_data_for_decision_tree(df):
+def process_data_for_decision_tree(df, model=''):
 	# Sex
 	df['Sex'] = df['Sex'].map({'male': 0, 'female': 1})
 
@@ -137,8 +139,7 @@ def process_data_for_decision_tree(df):
 	df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
 
 	df['Title'] = df['Title'].replace(
-		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mrs'], 'Rare')
-
+		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mrs', 'Miss'], 'Rare')
 	# Embarked
 	df['Embarked'] = df['Embarked'].astype('category').cat.codes
 
@@ -147,12 +148,13 @@ def process_data_for_decision_tree(df):
 
 	# Added Features
 	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
-	df['IsChild'] = df['Age'].apply(lambda x: int(x < 14))
+	df['IsChild'] = df['Age'].apply(lambda x: int(x < 7))
+	df['IsYouth'] = df['Age'].apply(lambda x: int(7 <= x < 14))
 	df['HasCabin'] = df['Cabin'].notna().astype(int)
 	df['RareTitle'] = df['Title'].apply(lambda x: int(x == 'Rare'))
-	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 40))
-	df['WhyTFDoesThisWork'] = df['FamilySize'].apply(lambda x: int(x >= 1))
-	# df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
+	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 39))
+	# df['WhyTFDoesThisWork'] = df['FamilySize'].apply(lambda x: int(x >= 1))
+	df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
 
 	return df
 
@@ -290,8 +292,8 @@ eclf = VotingClassifier(
 		('cat', cat_clf),
 		('light', light_clf)
 	],
-	voting='soft',
-	weights=[1, 1, 3]
+	voting='hard',
+	weights=[1, 1, 1]
 )
 
 OPTIMIZING = False
@@ -425,7 +427,7 @@ elif DEEP_OPTIMIZING:
 			('cat', gs_cat_clf.best_estimator_),
 			('light', gs_light_clf.best_estimator_)
 		],
-		voting='soft',
+		voting='hard',
 		weights=[1, 1, 1]
 	)
 
@@ -527,10 +529,10 @@ Y_train = pd.concat([Y_train, Y_val])
 # 	clf = eclf
 # 	opt_thresh = ens_opt_thresh
 
-xgb_clf.fit(X_train, Y_train)
+eclf.fit(X_train, Y_train)
 
 # Final Subission Preds
-submission_preds = xgb_clf.predict(X_test)
+submission_preds = eclf.predict(X_test)
 
 # Export Submission Data
 submission_df = pd.DataFrame({

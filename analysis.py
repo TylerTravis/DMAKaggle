@@ -104,7 +104,7 @@ def process_data_for_decision_tree(df):
 
 	# Added Features
 	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
-	df['IsChild'] = df['Age'].apply(lambda x: int(x < 12))
+	df['IsChild'] = df['Age'].apply(lambda x: int(x < 8))
 	df['HasCabin'] = (df['Cabin'] != -1).astype(int)
 	df['RareTitle'] = df['Title'].apply(lambda x: int(x == 'Rare'))
 	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 40))
@@ -117,6 +117,8 @@ X_train = process_data_for_decision_tree(train_df)
 X_test = process_data_for_decision_tree(test_df)
 
 # print(X_train.head())
+
+print()
 
 cols_for_corr = ['Pclass', 'Sex', 'SibSp', 'Parch', 'Fare', 'Cabin', 'Embarked', 'FamilySize', 'IsChild', 'HasCabin', 'RareTitle', 'ExpensiveFare', 'GroupSurvivalRate', 'WhyTFDoesThisWork']
 
