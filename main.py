@@ -5,11 +5,14 @@ import numpy as np
 import random
 
 # Sklearn
+from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import VotingClassifier, StackingClassifier, RandomForestClassifier, ExtraTreesClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, train_test_split
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
 
 # Other Models
 import xgboost as xgb
@@ -86,10 +89,10 @@ train_df['SameTicketSurvivalRate'] = all_data['SameTicketSurvivalRate'].iloc[:le
 test_df['SameTicketSurvivalRate'] = all_data['SameTicketSurvivalRate'].iloc[len(train_df):]
 
 def process_data(df):
+	df = df.copy()
 	# Imputation
 	df['Age'] = df['Age'].fillna(train_age_median)
 	df['Fare'] = df['Fare'].fillna(train_fare_median)
-	df['Embarked'] = df['Embarked'].fillna(train_embarked_mode)
 
 	# Quantification and One-Hots
 
@@ -102,9 +105,7 @@ def process_data(df):
 
 	# Name / Title
 	df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
-	df['Title'] = df['Title'].replace(['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer'], 'Rare')
-	df['Title'] = df['Title'].replace(['Mlle', 'Ms'], 'Miss')
-	df['Title'] = df['Title'].replace('Mme', 'Mrs')
+	df['Title'] = df['Title'].replace(['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mlle', 'Ms', 'Mme', 'Mrs'], 'Rare')
 
 	title_dummies = pd.get_dummies(df['Title'], prefix='Title', dtype=int)
 	df = pd.concat([df, title_dummies], axis=1)
@@ -117,18 +118,23 @@ def process_data(df):
 	cabin_dummies = pd.get_dummies(df['Cabin'].str[0], prefix='Cabin', dummy_na=True, dtype=int)
 	df = pd.concat([df, cabin_dummies], axis=1)
 
-	# Fare
-	df['Fare'] = np.log1p(df['Fare'])
+	# Logs
+	df['Log_Fare'] = np.log(df['Fare'] + 0.5)
+	df['Log_Age'] = np.log(df['Age'] + 0.5)
 
 	# Feature Engineering
 	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
-	# df['IsAlone'] = df['FamilySize'].apply(lambda x: int(x == 1))
-	# df['FarePerPerson'] = df['Fare'] / df['FamilySize']
-	df['IsChild'] = df['Age'].apply(lambda x: int(x < 15))
+	df['IsChild'] = df['Age'].apply(lambda x: int(x < 7))
+	df['IsYouth'] = df['Age'].apply(lambda x: int(7 <= x < 14))
+	df['HasCabin'] = df['Cabin'].notna().astype(int)
+	df['RareTitle'] = df['Title'].apply(lambda x: int(x == 'Rare'))
+	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 39))
+	df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
 
 	return df
 
 def process_data_for_decision_tree(df, model=''):
+	df = df.copy()
 	# Sex
 	df['Sex'] = df['Sex'].map({'male': 0, 'female': 1})
 
@@ -150,27 +156,54 @@ def process_data_for_decision_tree(df, model=''):
 	df['HasCabin'] = df['Cabin'].notna().astype(int)
 	df['RareTitle'] = df['Title'].apply(lambda x: int(x == 'Rare'))
 	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 39))
-	# df['WhyTFDoesThisWork'] = df['FamilySize'].apply(lambda x: int(x >= 1))
 	df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
 
 	return df
 
-X_train = process_data_for_decision_tree(train_df)
-X_test = process_data_for_decision_tree(test_df)
+# Decision Tree Data
+X_train_DT = process_data_for_decision_tree(train_df)
+X_test_DT = process_data_for_decision_tree(test_df)
 
-cols_to_drop = ['Name', 'Title', 'Cabin', 'Ticket', 'Fare', 'FamilySize']
+cols_to_drop_DT = ['Name', 'Title', 'Cabin', 'Ticket', 'Fare', 'FamilySize']
 
 # Test & Train
-X_train = X_train.drop(columns=['Survived', 'PassengerId'] + cols_to_drop)
-Y_train = train_df['Survived']
+X_train_DT = X_train_DT.drop(columns=['Survived', 'PassengerId'] + cols_to_drop_DT)
+Y_train_DT = train_df['Survived']
 
-X_test = X_test.drop(columns=['PassengerId'] + cols_to_drop)
-X_test = X_test.reindex(columns=X_train.columns, fill_value=0)
+X_test_DT = X_test_DT.drop(columns=['PassengerId'] + cols_to_drop_DT)
+X_test_DT = X_test_DT.reindex(columns=X_train_DT.columns, fill_value=0)
+
+X_train_DT = X_train_DT.add_suffix('_DT')
+X_test_DT = X_test_DT.add_suffix('_DT')
+
+# Geometric Data
+X_train_G = process_data(train_df)
+X_test_G = process_data(test_df)
+
+cols_to_drop_G = ['Name', 'Title', 'Cabin', 'Embarked', 'Pclass', 'Ticket', 'Fare', 'Age']
+
+# Test & Train
+X_train_G = X_train_G.drop(columns=['Survived', 'PassengerId'] + cols_to_drop_G)
+Y_train_G = train_df['Survived']
+
+X_test_G = X_test_G.drop(columns=['PassengerId'] + cols_to_drop_G)
+X_test_G = X_test_G.reindex(columns=X_train_G.columns, fill_value=0)
+
+X_train_G = X_train_G.add_suffix('_G')
+X_test_G = X_test_G.add_suffix('_G')
+
+# Merge DataFrames
+X_train_ALL = pd.concat([X_train_DT, X_train_G], axis=1)
+X_test_ALL = pd.concat([X_test_DT, X_test_G], axis=1)
 
 # Validation Split
-X_train, X_val, Y_train, Y_val = train_test_split(
-	X_train, Y_train, test_size=0.15, random_state=RANDOM_SEED
+X_train_ALL, X_val_ALL, Y_train, Y_val = train_test_split(
+    X_train_ALL, Y_train_DT, test_size=0.15, random_state=RANDOM_SEED
 )
+
+# Feature Lists
+dt_features = X_train_DT.columns.tolist()
+g_features = X_train_G.columns.tolist()
 
 # BASE MODELS
 
@@ -287,51 +320,71 @@ light_clf = lgb.LGBMClassifier(**light_params)
 
 # Random Forest
 rf_params = {
-	'n_estimators': 100,
-	'max_depth': 3,
-	'random_state': RANDOM_SEED
+	'n_estimators': 125,
+	'max_depth': 6,
+	'min_samples_split': 2,
+	'min_samples_leaf': 3,
+	'max_features': 'sqrt',
+	'bootstrap': False
 }
 
 rf_param_grid = {
-	'n_estimators': [50, 100, 150, 200],
-	'max_depth': [3, 5, 7, 9],
-	'min_samples_split': [2, 5, 10],
-	'min_samples_leaf': [1, 2, 4],
+	'n_estimators': [85, 100, 115],
+	'max_depth': [3],
+	'min_samples_split': [4, 5, 6],
+	'min_samples_leaf': [1, 2, 3, 4],
 	'max_features': ['sqrt', 'log2'],
 	'bootstrap': [True, False]
 }
 
 rf_clf = RandomForestClassifier(**rf_params)
 
+rf_clf = GridSearchCV(
+	estimator=rf_clf,
+	param_grid=rf_param_grid,
+	cv=5,
+	scoring='accuracy'
+)
+
 # Extra Trees
 et_params = {
-	'n_estimators': 100,
-	'max_depth': 3,
-	'random_state': RANDOM_SEED
+	'n_estimators': 118,
+	'max_depth': 7,
+	'min_samples_split': 5,
+	'min_samples_leaf': 2,
+	'max_features': 'sqrt',
+	'bootstrap': False
 }
 
 et_param_grid = {
-	'n_estimators': [50, 100, 150, 200],
-	'max_depth': [3, 5, 7, 9],
-	'min_samples_split': [2, 5, 10],
-	'min_samples_leaf': [1, 2, 4],
+	'n_estimators': [85, 100, 115],
+	'max_depth': [3],
+	'min_samples_split': [4, 5, 6],
+	'min_samples_leaf': [1, 2, 3, 4],
 	'max_features': ['sqrt', 'log2'],
 	'bootstrap': [True, False]
 }
 
 et_clf = ExtraTreesClassifier(**et_params)
 
+et_clf = GridSearchCV(
+	estimator=et_clf,
+	param_grid=et_param_grid,
+	cv=5,
+	scoring='accuracy'
+)
+
 # SVC
 svc_params = {
-	'C': 1,
-	'kernel': 'linear',
+	'C': 9,
+	'kernel': 'rbf',
 	'gamma': 'scale',
-	'probability': True,
+	'probability': False,
 	'random_state': RANDOM_SEED
 }
 
 svc_param_grid = {
-	'C': [0.1, 1, 10, 100],
+	'C': [0.1, 1, 5, 10, 25, 40, 60, 80],
 	'kernel': ['linear', 'rbf'],
 	'gamma': ['scale', 'auto'],
 	'probability': [True],
@@ -340,290 +393,124 @@ svc_param_grid = {
 
 svc_clf = SVC(**svc_params)
 
+svc_clf = GridSearchCV(
+	estimator=svc_clf,
+	param_grid=svc_param_grid,
+	cv=5,
+	scoring='accuracy'
+)
+
 # K Nearest Neighbors
 knn_params = {
-	'n_neighbors': 5,
+	'n_neighbors': 6,
 	'weights': 'uniform',
 	'algorithm': 'auto',
-	'leaf_size': 30,
-	'p': 2,
+	'leaf_size': 20,
+	'p': 1,
 	'n_jobs': -1
 }
 
 knn_param_grid = {
-	'n_neighbors': [3, 5, 7, 9, 11],
+	'n_neighbors': [3, 5, 7],
 	'weights': ['uniform', 'distance'],
 	'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'],
-	'leaf_size': [10, 20, 30, 40, 50],
+	'leaf_size': [20, 25, 30, 35, 40],
 	'p': [1, 2],
 	'n_jobs': [-1]
 }
 
 knn_clf = KNeighborsClassifier(**knn_params)
 
-# Ensemble
-eclf = VotingClassifier(
-	estimators=[
-		('xgb', xgb_clf),
-		('cat', cat_clf),
-		('light', light_clf),
-	],
-	voting='soft',
-	weights=[1, 1, 1]
+knn_clf = GridSearchCV(
+	estimator=knn_clf,
+	param_grid=knn_param_grid,
+	cv=5,
+	scoring='accuracy'
 )
 
-sclf = StackingClassifier(
-	estimators=[
-		('xgb', xgb_clf),
-		('cat', cat_clf),
-		('light', light_clf),
-		('rf', rf_clf),
-		('et', et_clf),
-		('svc', svc_clf),
-		('knn', knn_clf)
-	],
+base_models = [
+    ('xgb', xgb_clf),
+    ('cat', cat_clf),
+    ('light', light_clf),
+    ('rf', rf_clf),
+    ('et', et_clf),
+    ('svc', svc_clf),
+    ('knn', knn_clf)
+]
+
+# Ensembles
+v_clf = VotingClassifier(
+	estimators=base_models,
+	voting='soft',
+	weights=[1, 1, 1, 1, 1, 1, 1]
+)
+
+s_clf = StackingClassifier(
+	estimators=base_models,
 	final_estimator=LogisticRegression(),
 	cv=5,
 	n_jobs=-1
 )
 
-OPTIMIZING = False
-DEEP_OPTIMIZING = False
+# for name, clf in base_models + [('voting', v_clf), ('stacking', s_clf)]:
+# 	print("\n" + name + " Classifier")
+#
+# 	clf.fit(X_train_ALL, Y_train)
+#
+# 	# Train Preds and Acc
+# 	train_acc = clf.score(X_train_ALL, Y_train)
+# 	print("Train Accuracy: ", train_acc)
+#
+# 	# Validation Preds and Acc
+# 	val_acc = clf.score(X_val_ALL, Y_val)
+# 	print("Validation Accuracy: ", val_acc)
 
-if OPTIMIZING:
-	rs_xgb_clf = RandomizedSearchCV(
-		estimator=xgb_clf,
-		param_distributions=xgb_param_grid,
-		n_iter=gb_param_grid['random_generations'],
-		cv=5,
-		scoring='accuracy',
-		n_jobs=-1,
-		random_state=RANDOM_SEED,
-	)
-
-	rs_xgb_clf.fit(X_train, Y_train)
-
-	rs_cat_clf = RandomizedSearchCV(
-		estimator=cat_clf,
-		param_distributions=cat_param_grid,
-		n_iter=gb_param_grid['random_generations'],
-		cv=5,
-		scoring='accuracy',
-		n_jobs=-1,
-		random_state=RANDOM_SEED,
-		# return_train_score=True,
-		verbose=0
-	)
-
-	rs_cat_clf.fit(X_train, Y_train)
-
-	rs_light_clf = RandomizedSearchCV(
-		estimator=light_clf,
-		param_distributions=light_param_grid,
-		n_iter=gb_param_grid['random_generations'],
-		cv=5,
-		scoring='accuracy',
-		n_jobs=-1,
-		random_state=RANDOM_SEED,
-		# return_train_score=True,
-		verbose=0
-	)
-
-	rs_light_clf.fit(X_train, Y_train)
-
-	# Ensemble
-	eclf = VotingClassifier(
-		estimators=[
-			('xgb', rs_xgb_clf.best_estimator_),
-			('cat', rs_cat_clf.best_estimator_),
-			('light', rs_light_clf.best_estimator_)
-		],
-		voting='soft',
-		weights=[1.5, 1, 1.5]
-	)
-
-	# Model Accuracies
-	xgb_val_acc = 0
-	cat_val_acc = 0
-	light_val_acc = 0
-	ens_val_acc = 0
-
-	for clf in [rs_xgb_clf, rs_cat_clf, rs_light_clf, eclf]:
-		if clf == rs_xgb_clf:
-			print("\nXGB Classifier")
-		elif clf == rs_cat_clf:
-			print("\nCatBoost Classifier")
-		elif clf == rs_light_clf:
-			print("\nLightGBM Classifier")
-		else:
-			print("\nEnsemble Classifier")
-
-		if clf == eclf:
-			clf.fit(X_train, Y_train)
-
-		# Train Preds and Acc
-		train_pred = clf.predict(X_train)
-		train_acc = clf.score(X_train, Y_train)
-		print("Train Accuracy: ", train_acc)
-
-		# Validation Preds and Acc
-		val_acc = clf.score(X_val, Y_val)
-		print("Validation Accuracy: ", val_acc)
-
-		if clf == rs_xgb_clf:
-			xgb_val_acc = val_acc
-		elif clf == rs_cat_clf:
-			cat_val_acc = val_acc
-		elif clf == rs_light_clf:
-			light_val_acc = val_acc
-		else:
-			ens_val_acc = val_acc
-elif DEEP_OPTIMIZING:
-	# XGB Classifier
-	gs_xgb_clf = GridSearchCV(
-		estimator=xgb_clf,
-		param_grid=xgb_param_grid,
-		cv=5,
-		scoring='accuracy',
-		n_jobs=-1
-	)
-	gs_xgb_clf.fit(X_train, Y_train)
-
-	# CatBoost Classifier
-	gs_cat_clf = GridSearchCV(
-		estimator=cat_clf,
-		param_grid=cat_param_grid,
-		cv=5,
-		scoring='accuracy',
-		n_jobs=-1,
-		verbose=0
-	)
-	gs_cat_clf.fit(X_train, Y_train)
-
-	# LightGBM Classifier
-	gs_light_clf = GridSearchCV(
-		estimator=light_clf,
-		param_grid=light_param_grid,
-		cv=5,
-		scoring='accuracy',
-		n_jobs=-1,
-		verbose=0
-	)
-	gs_light_clf.fit(X_train, Y_train)
-
-	# Ensemble using the best estimators from GridSearchCV
-	eclf = VotingClassifier(
-		estimators=[
-			('xgb', gs_xgb_clf.best_estimator_),
-			('cat', gs_cat_clf.best_estimator_),
-			('light', gs_light_clf.best_estimator_)
-		],
-		voting='hard',
-		weights=[1, 1, 1]
-	)
-
-	# Aggregated Results
-
-
-	# Model Accuracies
-	xgb_val_acc = 0
-	cat_val_acc = 0
-	light_val_acc = 0
-	ens_val_acc = 0
-
-	for clf in [gs_xgb_clf, gs_cat_clf, gs_light_clf, eclf]:
-		if clf == gs_xgb_clf:
-			print("\nXGB Classifier")
-		elif clf == gs_cat_clf:
-			print("\nCatBoost Classifier")
-		elif clf == gs_light_clf:
-			print("\nLightGBM Classifier")
-		else:
-			print("\nEnsemble Classifier")
-
-		# Fit the ensemble (GridSearch models are already fit)
-		if clf == eclf:
-			clf.fit(X_train, Y_train)
-
-		# Train Preds and Acc
-		train_pred = clf.predict(X_train)
-		train_acc = clf.score(X_train, Y_train)
-		print("Train Accuracy: ", train_acc)
-
-		# Validation Preds and Acc
-		val_acc = clf.score(X_val, Y_val)
-		print("Validation Accuracy: ", val_acc)
-
-		# Track highest validation accuracies
-		if clf == gs_xgb_clf:
-			xgb_val_acc = val_acc
-		elif clf == gs_cat_clf:
-			cat_val_acc = val_acc
-		elif clf == gs_light_clf:
-			light_val_acc = val_acc
-		else:
-			ens_val_acc = val_acc
-
-	# Export Data For Analysis
-	xgb_results = pd.DataFrame(gs_xgb_clf.cv_results_)
-	xgb_results.insert(0, 'Model', 'XGBoost')
-
-	cat_results = pd.DataFrame(gs_cat_clf.cv_results_)
-	cat_results.insert(0, 'Model', 'CatBoost')
-
-	light_results = pd.DataFrame(gs_light_clf.cv_results_)
-	light_results.insert(0, 'Model', 'LightGBM')
-
-	# Export to CSV
-	all_grid_results = pd.concat([xgb_results, cat_results, light_results], ignore_index=True)
-	all_grid_results.to_csv('optimization.csv', index=False)
-else:
-	for clf in [xgb_clf, cat_clf, light_clf, eclf, sclf]:
-		clf.fit(X_train, Y_train)
-
-		if clf == xgb_clf:
-			print("\nXGB Classifier")
-		elif clf == cat_clf:
-			print("\nCatBoost Classifier")
-		elif clf == light_clf:
-			print("\nLightGBM Classifier")
-		else:
-			print("\nEnsemble Classifier")
-
-		# Train Preds and Acc
-		train_pred = clf.predict(X_train)
-		train_acc = clf.score(X_train, Y_train)
-		print("Train Accuracy: ", train_acc)
-
-		# Validation Preds and Acc
-		val_acc = clf.score(X_val, Y_val)
-		print("Validation Accuracy: ", val_acc)
 
 # Recombine Training and Validation Data
-X_train = pd.concat([X_train, X_val])
-Y_train = pd.concat([Y_train, Y_val])
+predictions = []
 
-# best_val_acc = max([xgb_val_acc, cat_val_acc, light_val_acc, ens_val_acc])
-# opt_thresh = 0
+prediction_weights = [
+	0.993498049415,
+	0.97789336801,
+	1,
+	0.967486377983,
+	0.968773683389,
+	0.964875402612,
+	0.958409783936
+]
+
+# Fit and Predict Proabilities
+for model in base_models:
+	# Disjoint training
+	if model[0] in ['xgb', 'cat', 'light', 'rf', 'et']:
+		model[1].fit(X_train_DT, Y_train_DT)
+		predictions.append(model[1].predict_proba(X_test_DT)[1])
+	else:
+		model[1].fit(X_train_G, Y_train_G)
+		predictions.append(model[1].predict_proba(X_test_G)[1])
+
+submission_preds = []
+
+print(predictions)
+
+for i, pred in predictions:
+	weighted_pred = pred[1] * prediction_weights[i]
+	submission_preds.append(1 if weighted_pred > 0.5 else 0)
+
+# mean_pred = sum(prediction_weights) / len(prediction_weights)
 #
-# # Select Best Model
-# if best_val_acc == xgb_val_acc:
-# 	clf = rs_xgb_clf.best_estimator_
-# 	opt_thresh = xgb_opt_thresh
-# elif best_val_acc == cat_val_acc:
-# 	clf = rs_cat_clf.best_estimator_
-# 	opt_thresh = cat_opt_thresh
-# elif best_val_acc == light_val_acc:
-# 	clf = rs_light_clf.best_estimator_
-# 	opt_thresh = light_opt_thresh
-# elif best_val_acc == ens_val_acc:
-# 	clf = eclf
-# 	opt_thresh = ens_opt_thresh
+# soft_preds = 1 if mean_pred > 0.5 else 0
 
-eclf.fit(X_train, Y_train)
+
+
+
+# X_train_ALL = pd.concat([X_train_ALL, X_val_ALL])
+# Y_train_ALL = pd.concat([Y_train, Y_val])
+
+# s_clf.fit(X_train, Y_train_ALL)
 
 # Final Subission Preds
-submission_preds = eclf.predict(X_test)
+# submission_preds = s_clf.predict(X_test_ALL)
 
 # Export Submission Data
 submission_df = pd.DataFrame({

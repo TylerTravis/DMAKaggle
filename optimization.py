@@ -704,13 +704,14 @@ columns_to_analyze = [
 	'param_colsample_bytree'
 ]
 
-for col in columns_to_analyze:
-	proportions = opt_sorted[col].value_counts(normalize=True) * 100
-	print(proportions, '%')
+def analysis():
+	for col in columns_to_analyze:
+		proportions = opt_sorted[col].value_counts(normalize=True) * 100
+		print(proportions, '%')
 
-	plt.hist(opt_sorted[col], bins=10, color='red', edgecolor='black')
+		plt.hist(opt_sorted[col], bins=10, color='red', edgecolor='black')
 
-	plt.title(col)
-	plt.xlabel('Value')
-	plt.ylabel('Count')
-	plt.show()
+		plt.title(col)
+		plt.xlabel('Value')
+		plt.ylabel('Count')
+		plt.show()
