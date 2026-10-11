@@ -692,7 +692,7 @@ opt_sorted = opt_filtered.sort_values(by='rank_test_score', ascending=False)
 best_h = opt_sorted['params'].iloc[0]
 print("BEST HYPERPARAMETERS: ", best_h)
 
-columns_to_analyze = [
+columns_to_ignore = [
 	'param_subsample',
 	'param_reg_lambda',
 	'param_reg_alpha',
@@ -704,14 +704,13 @@ columns_to_analyze = [
 	'param_colsample_bytree'
 ]
 
-def analysis():
-	for col in columns_to_analyze:
-		proportions = opt_sorted[col].value_counts(normalize=True) * 100
-		print(proportions, '%')
+for col in columns_to_ignore:
+	proportions = opt_sorted[col].value_counts(normalize=True) * 100
+	print(proportions, '%')
 
-		plt.hist(opt_sorted[col], bins=10, color='red', edgecolor='black')
+	plt.hist(opt_sorted[col], bins=10, color='red', edgecolor='black')
 
-		plt.title(col)
-		plt.xlabel('Value')
-		plt.ylabel('Count')
-		plt.show()
+	plt.title(col)
+	plt.xlabel('Value')
+	plt.ylabel('Count')
+	plt.show()

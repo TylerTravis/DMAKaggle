@@ -1,18 +1,12 @@
 # General
-import kagglehub
-import pandas as pd
-import numpy as np
-import random
+from data import *
 
 # Sklearn
-from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import VotingClassifier, StackingClassifier, RandomForestClassifier, ExtraTreesClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
 
 # Other Models
 import xgboost as xgb
@@ -24,173 +18,6 @@ random.seed(RANDOM_SEED)
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
-
-# Download latest version
-# path = kagglehub.competition_download('dma-26-kaggle-competition')
-
-train_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/train.csv')
-test_df = pd.read_csv('/Users/johnd/.cache/kagglehub/competitions/dma-26-kaggle-competition/test.csv')
-
-test_passenger_ids = test_df['PassengerId']
-
-# Imputation Values
-train_age_median = train_df['Age'].median()
-train_fare_median = train_df['Fare'].median()
-train_embarked_mode = train_df['Embarked'].mode()[0]
-
-# Group Survival Rate
-def calculate_group_survival(df):
-	copy = df.copy()
-	copy['LastName'] = copy['Name'].str.extract(r'([A-Za-z]+),', expand=False)
-
-	def get_companion_survival_rate(passenger_id, last_name, ticket):
-		companions = copy[
-			((copy['LastName'] == last_name) | (copy['Ticket'] == ticket)) &
-			(copy.index != passenger_id)
-			]
-
-		companions = companions.dropna(subset=['Survived'])
-
-		if len(companions) > 0:
-			return companions['Survived'].mean()
-		else:
-			return -1
-
-	return copy.apply(lambda x: get_companion_survival_rate(x.name, x['LastName'], x['Ticket']), axis=1)
-
-def calculate_same_ticket_survival(df):
-	copy = df.copy()
-	copy['LastName'] = copy['Name'].str.extract(r'([A-Za-z]+),', expand=False)
-
-	def get_companion_survival_rate(passenger_id, last_name, ticket):
-		companions = copy[
-			((copy['Ticket'] == ticket)) &
-			(copy.index != passenger_id)
-			]
-
-		companions = companions.dropna(subset=['Survived'])
-
-		if len(companions) > 0:
-			return companions['Survived'].mean()
-		else:
-			return -1
-
-	return copy.apply(lambda x: get_companion_survival_rate(x.name, x['LastName'], x['Ticket']), axis=1)
-
-all_data = pd.concat([train_df, test_df])
-
-all_data['GroupSurvivalRate'] = calculate_group_survival(all_data)
-all_data['SameTicketSurvivalRate'] = calculate_same_ticket_survival(all_data)
-
-train_df['GroupSurvivalRate'] = all_data['GroupSurvivalRate'].iloc[:len(train_df)]
-test_df['GroupSurvivalRate'] = all_data['GroupSurvivalRate'].iloc[len(train_df):]
-
-train_df['SameTicketSurvivalRate'] = all_data['SameTicketSurvivalRate'].iloc[:len(train_df)]
-test_df['SameTicketSurvivalRate'] = all_data['SameTicketSurvivalRate'].iloc[len(train_df):]
-
-def process_data(df):
-	df = df.copy()
-	# Imputation
-	df['Age'] = df['Age'].fillna(train_age_median)
-	df['Fare'] = df['Fare'].fillna(train_fare_median)
-
-	# Quantification and One-Hots
-
-	# Sex
-	df['Sex'] = df['Sex'].map({'male': 0, 'female': 1})
-
-	# Class
-	pclass_dummies = pd.get_dummies(df['Pclass'], prefix='Pclass', dtype=int)
-	df = pd.concat([df, pclass_dummies], axis=1)
-
-	# Name / Title
-	df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
-	df['Title'] = df['Title'].replace(['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mlle', 'Ms', 'Mme', 'Mrs'], 'Rare')
-
-	title_dummies = pd.get_dummies(df['Title'], prefix='Title', dtype=int)
-	df = pd.concat([df, title_dummies], axis=1)
-
-	# Embarked
-	embarked_dummies = pd.get_dummies(df['Embarked'].str[0], prefix='Embarked', dummy_na=True, dtype=int)
-	df = pd.concat([df, embarked_dummies], axis=1)
-
-	# Cabin
-	cabin_dummies = pd.get_dummies(df['Cabin'].str[0], prefix='Cabin', dummy_na=True, dtype=int)
-	df = pd.concat([df, cabin_dummies], axis=1)
-
-	# Logs
-	df['Log_Fare'] = np.log(df['Fare'] + 0.5)
-	df['Log_Age'] = np.log(df['Age'] + 0.5)
-
-	# Feature Engineering
-	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
-	df['IsChild'] = df['Age'].apply(lambda x: int(x < 7))
-	df['IsYouth'] = df['Age'].apply(lambda x: int(7 <= x < 14))
-	df['HasCabin'] = df['Cabin'].notna().astype(int)
-	df['RareTitle'] = df['Title'].apply(lambda x: int(x == 'Rare'))
-	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 39))
-	df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
-
-	return df
-
-def process_data_for_decision_tree(df, model=''):
-	df = df.copy()
-	# Sex
-	df['Sex'] = df['Sex'].map({'male': 0, 'female': 1})
-
-	# Name / Title
-	df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
-
-	df['Title'] = df['Title'].replace(
-		['Master', 'Don', 'Rev', 'Dr', 'Major', 'Lady', 'Sir', 'Col', 'Capt', 'Countess', 'Jonkheer', 'Mrs', 'Miss', 'Mlle', 'Ms'], 'Rare')
-	# Embarked
-	df['Embarked'] = df['Embarked'].astype('category').cat.codes
-
-	# Cabin
-	# df['Cabin'] = df['Cabin'].str.extract(r'([A-Za-z])', expand=False).astype('category').cat.codes
-
-	# Added Features
-	df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
-	df['IsChild'] = df['Age'].apply(lambda x: int(x < 7))
-	df['IsYouth'] = df['Age'].apply(lambda x: int(7 <= x < 14))
-	df['HasCabin'] = df['Cabin'].notna().astype(int)
-	df['RareTitle'] = df['Title'].apply(lambda x: int(x == 'Rare'))
-	df['ExpensiveFare'] = df['Fare'].apply(lambda x: int(x > 39))
-	df['IsChildAndFamilyMemberSurvived'] = df.apply(lambda row: int(row['IsChild'] and row['GroupSurvivalRate'] > 0), axis=1)
-
-	return df
-
-# Decision Tree Data
-X_train_DT = process_data_for_decision_tree(train_df)
-X_test_DT = process_data_for_decision_tree(test_df)
-
-cols_to_drop_DT = ['Name', 'Title', 'Cabin', 'Ticket', 'Fare', 'FamilySize']
-
-# Test & Train
-X_train_DT = X_train_DT.drop(columns=['Survived', 'PassengerId'] + cols_to_drop_DT)
-Y_train_G_DT = train_df['Survived']
-
-X_test_DT = X_test_DT.drop(columns=['PassengerId'] + cols_to_drop_DT)
-X_test_DT = X_test_DT.reindex(columns=X_train_DT.columns, fill_value=0)
-
-X_train_DT = X_train_DT.add_suffix('_DT')
-X_test_DT = X_test_DT.add_suffix('_DT')
-
-# Geometric Data
-X_train_G = process_data(train_df)
-X_test_G = process_data(test_df)
-
-cols_to_drop_G = ['Name', 'Title', 'Cabin', 'Embarked', 'Pclass', 'Ticket', 'Fare', 'Age']
-
-# Test & Train
-X_train_G = X_train_G.drop(columns=['Survived', 'PassengerId'] + cols_to_drop_G)
-Y_train_G = train_df['Survived']
-
-X_test_G = X_test_G.drop(columns=['PassengerId'] + cols_to_drop_G)
-X_test_G = X_test_G.reindex(columns=X_train_G.columns, fill_value=0)
-
-X_train_G = X_train_G.add_suffix('_G')
-X_test_G = X_test_G.add_suffix('_G')
 
 # Decision TRee Models
 gb_params = {
@@ -377,6 +204,8 @@ svc_param_grid = {
 
 svc_clf = SVC(**svc_params)
 
+# [1.6, 0.4, 0.4, 0.3, 1.5]
+
 svc_clf = GridSearchCV(
 	estimator=svc_clf,
 	param_grid=svc_param_grid,
@@ -415,59 +244,90 @@ knn_clf = GridSearchCV(
 	scoring='accuracy'
 )
 
-for model in [xgb_clf, cat_clf, light_clf]:
-	model.fit(X_train_DT, Y_train_G)
+base_models = [
+    ('xgb', xgb_clf),
+    ('cat', cat_clf),
+    ('light', light_clf),
+    ('rf', rf_clf),
+    ('et', et_clf)
+]
 
-	# Cross-Validation Acc
-	# print("Cross Validation Accuracy: ", model)
+RS_weights = [1.9, 0.6, 1.4, 1.8, 1.6]
 
-	# Train Acc
-	train_acc = model.score(X_train_DT, Y_train_G)
-	print("Train Accuracy: ", train_acc)
+# Ensembles
+v_clf = VotingClassifier(
+	estimators=base_models,
+	voting='hard',
+	weights=RS_weights
+)
 
-	# Validation Acc
-	val_acc = model.score(X_train_DT, Y_train_G)
-	print("Validation Accuracy: ", val_acc)
+s_clf = StackingClassifier(
+	estimators=base_models,
+	final_estimator=LogisticRegression(),
+	cv=2,
+	n_jobs=-1
+)
 
-	# Print best params
-	# print(model.best_params_)
+def test_models(models = [], ensembles = []):
+	cv_acc = 0
+	train_acc = 0
+	val_acc = 0
 
-# XGB
+	for model in models:
+		print("Model: ", model[0])
+		model[1].fit(X_train_CV, Y_train_CV)
 
-# Train Accuracy:  0.8574635241301908
-# Validation Accuracy:  0.8574635241301908
+		# Train Acc
+		train_acc = model[1].score(X_train_DT, Y_train)
+		print("Train Accuracy: ", train_acc)
 
-# Cat
+		# Validation Acc
+		val_acc = model[1].score(X_val, Y_val)
+		print("Validation Accuracy: ", val_acc, '\n')
 
-# Train Accuracy:  0.8439955106621774
-# Validation Accuracy:  0.8439955106621774
+	for model in ensembles:
+		model.fit(X_train_CV, Y_train_CV)
 
-# Light
+		# Cross-Validation Acc
+		cv_acc = model.score(X_train_CV, Y_train_CV)
+		print("Cross Validation Accuracy: ", cv_acc)
 
-# Train Accuracy:  0.8630751964085297
-# Validation Accuracy:  0.8630751964085297
+		# Train Acc
+		train_acc = model.score(X_train_DT, Y_train)
+		print("Train Accuracy: ", train_acc)
 
-# RF
+		# Validation Acc
+		val_acc = model.score(X_val, Y_val)
+		print("Validation Accuracy: ", val_acc, '\n')
 
-# Cross Validation Accuracy:  0.8350134957002071
-# Train Accuracy:  0.8821548821548821
+	return cv_acc, train_acc, val_acc
 
-# ET
+# test_models(base_models, [v_clf, s_clf])
 
-# Cross Validation Accuracy:  0.8361245370660975
-# Train Accuracy:  0.8731762065095399
+def test_model_weights(ensemble, n_iter):
+	best_agg_acc = 0
+	best_weights = []
 
-# SVC
+	possible_weights = [i / 10 for i in range(1, 21)]
 
-# Cross Validation Accuracy:  0.8327600276191074
-# Train Accuracy:  0.8540965207631874
+	for combo in range(n_iter):
+		weights = [random.choice(possible_weights) for _ in range(len(ensemble.estimators))]
 
-# KNN
+		clf = VotingClassifier(
+			estimators=base_models,
+			voting='soft',
+			weights=weights,
+			n_jobs=-1
+		)
 
-# Cross Validation Accuracy:  0.8271797125102003
-# Train Accuracy:  0.8585858585858586
+		print("Weights: ", weights)
 
-# print(rf_clf)
-# print(et_clf)
-# print(svc_clf)
-# print(knn_clf)
+		cv_acc, test_acc, val_acc = test_models(ensembles=[clf])
+
+		if sum([cv_acc, test_acc, val_acc]) / 3 > best_agg_acc:
+			best_weights = weights
+
+	print("Optimal Weights: ", best_weights)
+	return best_weights
+
+# opt_weights = test_model_weights(v_clf, 5000)
